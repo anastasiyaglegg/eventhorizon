@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 const id = z.string().min(1).max(80);
-const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/).nullable();
+// HH:MM:SS with seconds fixed at 00, so calculated overlaps are always whole minutes.
+const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d:00$/).nullable();
 const taskSchema = z.object({
   task_id: id,
   name: z.string().min(1).max(200),
