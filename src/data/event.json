@@ -1,0 +1,39 @@
+{
+  "contract_version": "planning.v1",
+  "snapshot": {
+    "event": {
+      "name": "North Star Product Launch",
+      "event_date": "2026-11-20",
+      "time_zone": "America/New_York",
+      "start_time": "18:00:00",
+      "vendor": {
+        "vendor_id": "caterer-001",
+        "name": "Harborlight Catering",
+        "arrival_time": "16:00:00",
+        "setup_duration_minutes": 90
+      },
+      "tasks": [
+        {
+          "task_id": "catering-ready",
+          "name": "Catering station ready",
+          "start_time": "18:00:00",
+          "end_time": "18:15:00",
+          "depends_on_vendor_ids": [
+            "caterer-001"
+          ]
+        },
+        {
+          "task_id": "av-check",
+          "name": "Audio-visual line check",
+          "start_time": "17:00:00",
+          "end_time": "17:30:00",
+          "depends_on_vendor_ids": []
+        }
+      ]
+    },
+    "proposed_change": {
+      "vendor_id": "caterer-001",
+      "proposed_arrival_time": "17:00:00"
+    }
+  }
+}

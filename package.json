@@ -1,0 +1,44 @@
+{
+  "name": "eventhorizon",
+  "version": "1.0.0",
+  "description": "Single-call event impact analysis and local arrival approval.",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anastasiyaglegg/eventhorizon.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/anastasiyaglegg/eventhorizon/issues"
+  },
+  "homepage": "https://github.com/anastasiyaglegg/eventhorizon#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "luxon": "^3.7.2",
+    "next": "^16.4.5",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.6",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "private": true
+}

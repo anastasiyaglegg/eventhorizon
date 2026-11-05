@@ -1,26 +1,81 @@
 # Event Horizon
 
-Event Horizon is an AI-assisted event readiness prototype for coordinators. It brings one seeded event’s guest count, tasks, vendors, known costs, and run-of-show into one dashboard.
+A three-day prototype that analyzes one vendor arrival change using one Claude
+request, exact time calculations in code, and local approve/reject behavior.
 
-## MVP workflow
+## Current build
 
-1. The coordinator enters a proposed vendor arrival time.
-2. The orchestrator freezes a versioned event snapshot and runs the Planning and Readiness agents in parallel. Planning identifies affected schedule items. Readiness identifies missing details and proposes internal follow-up tasks.
-3. Application code validates the findings and their references and calculates exact schedule overlaps and known costs. If a vendor question remains, the Vendor Follow-up agent can draft one message for the coordinator to copy.
-4. The coordinator reviews the proposed field changes and approves or rejects them as a batch. Approval applies allowlisted local updates and records the decision. Rejection preserves the event. If the event version changed, approval requires a fresh analysis.
+The local implementation provides a Next.js backend and reusable session-state
+functions for Crystal's interface. The homepage is a minimal scaffold. The
+coordinator input and report screens are still to be integrated with her work.
 
-All three agents share one configured AI provider and model. They receive read-only input and have no tools. Missing facts stay unknown. Invalid output, disagreement, and provider failures require human review. Vendor messages are drafts for manual copying. The MVP uses synthetic data and keeps provider credentials server-side.
+- GET /api/event returns the seeded planning.v1 input.
+- POST /api/analyze accepts that input with a proposed arrival time and returns
+  the validated report, calculated setup finish and overlap, and proposed time.
+- src/lib/session.ts implements pending analysis, response receipt, cancellation,
+  approval, and rejection for browser session state.
+- src/server/anthropic.ts makes one server-side Anthropic request per analysis.
+  It uses claude-opus-4-6 with medium effort and disables SDK retries.
+- The server returns explicit input, output, configuration, timeout, and provider
+  errors. Errors block a successful report and leave event data untouched.
 
-## Demo scenario
+## Run locally
 
-The event starts at 6 PM, and the vendor needs 90 minutes to set up. The baseline 4 PM arrival leaves 30 minutes before the event starts. Moving arrival to 5 PM creates a 30-minute overlap. The review should show the affected tasks, the calculated overlap, the proposed local changes, and a draft for the correct vendor.
+Use Node.js 22 or newer.
 
-## Working on Windows and macOS
+1. Run npm ci.
+2. Copy .env.example to .env.local and set ANTHROPIC_API_KEY locally.
+3. Run npm run dev.
+4. GET /api/event for the input example. POST that JSON to /api/analyze.
 
-Use a separate local clone on each computer once the shared remote is available. Push your branch before switching computers and pull it before resuming work. Keep local credentials in a separate environment file on each machine. Use consistent filename casing and keep scripts portable across both platforms.
+The selected model is configurable through ANTHROPIC_MODEL. Keep medium effort
+compatible with the configured model. The API key stays on the server.
 
-Crystal Watson and Anastasiya Glegg each work on a feature branch and review each other’s pull requests. Both test changes in `develop` and approve them before promotion to `main`.
+Run npm run typecheck, npm test, and npm run build for local verification.
+Provider tests simulate responses. On November 5, 2026, one live Claude Opus 4.6
+medium analysis passed through POST /api/analyze with the team's API key. It returned
+the dependent catering task and the code-calculated 30-minute overlap. The first
+live response failed schema validation; enabling structured JSON output resolved it.
 
-## Product requirements
+## Handoff to Crystal
 
-See the [Event Horizon PRD](https://docs.google.com/document/d/1eqek1tXTcvPv9cgyvkWScJjRMRW4HO3Phi-A7GKCodc/edit?usp=drivesdk) for agent contracts, approval rules, and the six evaluation cases.
+The starting structure follows her November 5 Slack corrections:
+proposed_change is inside snapshot, times use HH:MM:SS or null, and the output
+keeps affected_task_ids, scheduling_risks, unknowns, and recommendation.
+Display only HH:MM in the coordinator interface.
+
+The Zod schemas and exported types are in src/lib/contract.ts.
+The revised implementation-aligned schema from Crystal is still pending. This
+implementation is a proposed integration boundary, not a verified integration
+with her unpublished code.
+
+- event.time_zone is an IANA zone. All entered clock values belong to
+  event.event_date. Setup duration can roll into the following date.
+  Ambiguous/nonexistent daylight-saving times are rejected for clarification.
+- tasks[].depends_on_vendor_ids explicitly records setup dependencies. Code
+  flags only linked tasks whose start precedes setup completion.
+- calculation contains setup_finish (ISO date with offset), overlap_minutes,
+  affected_task_ids, and unknowns. Missing inputs produce null calculations.
+- The response has analysis, calculation, and proposed_arrival_time.
+- Errors preserve her agent/contract_version/status envelope and return an
+  error object with code, message, and details.
+- An analysis action calls beginAnalysis with a unique requestId. Editing the
+  proposed arrival must call clearProposal so a previous response cannot enable
+  approval. Route successful packets through receiveAnalysis and failures
+  through failAnalysis. decide requires review-ready state and applies the
+  arrival only on approval. These helpers are intended for React state.
+- The request ID is a client correlation token. Durable snapshot versions and
+  approval endpoints are outside this local-session implementation.
+
+## Scope and collaboration
+
+The authoritative requirements are in docs/PRD.md and its linked Google Doc.
+Separate Readiness and Vendor Follow-up agents, audit history, cost analysis,
+and persisted version checks are stretch work.
+
+Crystal owns her Planning implementation and interface. This change supplies a
+replaceable server adapter and session helpers while her revised schema is
+pending. Compare those contracts before combining the code.
+
+Work locally on Vantagepoint, review PRs into develop, and promote to main only
+after approval. Ask Anastasiya before pushing or opening a PR.
