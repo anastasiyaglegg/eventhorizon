@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { AnalysisError } from "../lib/contract";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { analysisOutputSchema, AnalysisError } from "../lib/contract";
 import type { AnalysisProvider } from "./analyze";
 
 const system = [
@@ -25,7 +26,7 @@ export const callAnthropic: AnalysisProvider = async (input, calculation) => {
       model: process.env.ANTHROPIC_MODEL || "claude-opus-4-6",
       max_tokens: 3000,
       thinking: { type: "adaptive" },
-      output_config: { effort: "medium" },
+      output_config: { effort: "medium", format: zodOutputFormat(analysisOutputSchema) },
       system,
       messages: [{ role: "user", content: JSON.stringify({ input, calculation }) }],
     });

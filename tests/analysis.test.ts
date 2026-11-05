@@ -125,6 +125,8 @@ test("Anthropic adapter makes one Opus medium request and never retries a provid
     const body = request instanceof Request ? await request.json() : JSON.parse(String(init?.body));
     assert.equal(body.model, "claude-opus-4-6");
     assert.equal(body.output_config.effort, "medium");
+    assert.equal(body.output_config.format.type, "json_schema");
+    assert.ok(body.output_config.format.schema.properties.scheduling_risks);
     assert.equal(body.thinking.type, "adaptive");
     return new Response('{"error":{"type":"overloaded_error","message":"private"}}', {
       status: 529, headers: { "content-type": "application/json" },

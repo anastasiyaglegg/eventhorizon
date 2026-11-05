@@ -32,8 +32,10 @@ The selected model is configurable through ANTHROPIC_MODEL. Keep medium effort
 compatible with the configured model. The API key stays on the server.
 
 Run npm run typecheck, npm test, and npm run build for local verification.
-Provider tests simulate responses. A successful live Claude analysis still needs
-verification with the team's API credits.
+Provider tests simulate responses. On November 5, 2026, one live Claude Opus 4.6
+medium analysis passed through POST /api/analyze with the team's API key. It returned
+the dependent catering task and the code-calculated 30-minute overlap. The first
+live response failed schema validation; enabling structured JSON output resolved it.
 
 ## Handoff to Crystal
 
