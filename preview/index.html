@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event Horizon · Planning Preview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1e293b;
+      --muted: #64748b;
+      --line: #dbe3ee;
+      --surface: #ffffff;
+      --wash: #f4f7fb;
+      --blue: #2457c5;
+      --blue-soft: #eaf1ff;
+      --amber: #9a5b00;
+      --amber-soft: #fff5dc;
+      --green: #176b4d;
+      --green-soft: #eaf8f1;
+      --red: #a23838;
+      --red-soft: #fff0f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--wash);
+      color: var(--ink);
+      font: 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { max-width: 1120px; margin: 0 auto; padding: 32px 20px 56px; }
+    header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 24px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); line-height: 1.1; margin-bottom: 8px; }
+    h2 { font-size: 1.15rem; margin-bottom: 14px; }
+    h3 { font-size: 1rem; margin-bottom: 6px; }
+    .eyebrow { color: var(--blue); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .75rem; }
+    .subtitle { color: var(--muted); max-width: 680px; margin-bottom: 0; }
+    .badge { background: var(--blue-soft); border: 1px solid #c8d8ff; border-radius: 999px; color: var(--blue); font-size: .8rem; font-weight: 700; padding: 7px 11px; white-space: nowrap; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 8px 24px rgba(30, 41, 59, .05); padding: 20px; margin-bottom: 16px; }
+    .wide { grid-column: 1 / -1; }
+    .meta { color: var(--muted); font-size: .9rem; }
+    .value { font-weight: 700; }
+    .arrival-panel { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; }
+    label { color: var(--muted); display: block; font-size: .85rem; font-weight: 700; margin-bottom: 5px; }
+    input, button { border-radius: 10px; font: inherit; }
+    input { border: 1px solid #b9c6d8; color: var(--ink); padding: 10px 12px; }
+    button { background: var(--blue); border: 0; color: white; cursor: pointer; font-weight: 700; padding: 11px 16px; }
+    button:hover { background: #1b449d; }
+    button:disabled { cursor: wait; opacity: .65; }
+    .arrival-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+    .arrival-box { background: var(--wash); border-radius: 12px; padding: 14px; }
+    .arrival-box.proposed { background: var(--blue-soft); }
+    .task-list { display: grid; gap: 10px; }
+    .task { border-left: 4px solid #a9bad6; background: var(--wash); border-radius: 8px; padding: 10px 12px; }
+    .task-time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: .9rem; }
+    .status { border-radius: 999px; display: inline-block; font-size: .8rem; font-weight: 800; padding: 5px 9px; text-transform: uppercase; letter-spacing: .04em; }
+    .status.overlap { background: var(--amber-soft); color: var(--amber); }
+    .status.no_overlap { background: var(--green-soft); color: var(--green); }
+    .status.unknown, .status.error { background: var(--red-soft); color: var(--red); }
+    .result-line { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+    ul { margin: 8px 0 0; padding-left: 20px; }
+    .risk { background: var(--amber-soft); border: 1px solid #f0d69a; border-radius: 10px; margin-top: 10px; padding: 12px; }
+    .unknown { background: var(--red-soft); border: 1px solid #f2c2c2; border-radius: 10px; margin-top: 10px; padding: 12px; }
+    .evidence { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; margin-top: 8px; }
+    .note { color: var(--muted); font-size: .9rem; }
+    .error { background: var(--red-soft); border: 1px solid #f2c2c2; border-radius: 10px; color: var(--red); padding: 14px; }
+    .source-tag { border-radius: 999px; display: inline-block; font-size: .72rem; font-weight: 800; letter-spacing: .04em; padding: 4px 8px; text-transform: uppercase; }
+    .source-tag.deterministic { background: var(--green-soft); color: var(--green); }
+    .source-tag.simulated { background: var(--blue-soft); color: var(--blue); }
+    .review-note { background: var(--blue-soft); border: 1px solid #c8d8ff; border-radius: 10px; color: #31528c; padding: 12px; }
+    .review-table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; min-width: 560px; width: 100%; }
+    th, td { border-bottom: 1px solid var(--line); padding: 10px 8px; text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: .82rem; }
+    td { font-size: .9rem; }
+    .review-setup { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0 18px; }
+    .setup-box { background: var(--wash); border-radius: 10px; padding: 12px; }
+    .setup-box.proposed { background: var(--blue-soft); }
+    .integration-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .integration-boundary { border: 1px dashed #b9c6d8; border-radius: 10px; padding: 12px; }
+    .integration-boundary strong { display: block; margin-bottom: 4px; }
+    .review-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    .review-actions button { background: #d9e1ec; color: #55657b; cursor: not-allowed; }
+    .review-actions button:not(:disabled) { background: var(--blue); color: white; cursor: pointer; }
+    .approval-state { margin: 10px 0 0; }
+    .approval-state.success { color: var(--green); font-weight: 700; }
+    @media (max-width: 700px) {
+      header { display: block; }
+      .badge { display: inline-block; margin-top: 14px; }
+      .grid, .arrival-comparison, .review-setup, .integration-grid { grid-template-columns: 1fr; }
+      .wide { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <div class="eyebrow">Event Horizon</div>
+        <h1>Planning Agent preview</h1>
+        <p class="subtitle">Explore a proposed vendor arrival against the seeded event schedule. This is a local, preview-only demonstration.</p>
+      </div>
+      <div class="badge">Simulated AI · No live request</div>
+    </header>
+
+    <section class="card" aria-labelledby="arrival-heading">
+      <h2 id="arrival-heading">Propose a vendor arrival</h2>
+      <div class="arrival-panel">
+        <div>
+          <label for="arrival-time">Proposed arrival time</label>
+          <input id="arrival-time" type="time" aria-describedby="arrival-help">
+          <div id="arrival-help" class="note">Leave blank to test missing arrival information.</div>
+        </div>
+        <button id="analyze" type="button">Analyze preview</button>
+      </div>
+      <div id="comparison" class="arrival-comparison" hidden></div>
+    </section>
+
+    <div id="error" class="error" hidden></div>
+    <div id="content" hidden>
+      <section class="card">
+        <h2 id="event-title">Seeded event</h2>
+        <p id="event-meta" class="meta"></p>
+        <h3>Vendor</h3>
+        <p id="vendor-meta" class="meta"></p>
+      </section>
+
+      <section class="card">
+        <h2>Event schedule</h2>
+        <p class="note">Explicitly dependent scheduled tasks are listed with their stable task IDs.</p>
+        <div id="tasks" class="task-list"></div>
+      </section>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Exact deterministic timing</h2>
+          <p><span class="source-tag deterministic">Application-calculated</span></p>
+          <div id="overlap-result"></div>
+        </section>
+
+        <section class="card">
+          <h2>Planning/Readiness analysis</h2>
+          <p><span class="source-tag simulated">One simulated AI call · planning.v1</span></p>
+          <p class="note">Interpretation only. Exact timing values come from application code.</p>
+          <div id="planning-result"></div>
+        </section>
+      </div>
+
+      <section class="card" aria-labelledby="review-heading">
+        <h2 id="review-heading">Review proposed change</h2>
+        <p class="note">Read-only local comparison until an explicit decision. Approve changes only the local session event.</p>
+        <div class="review-note">This preview compares the current event with a proposed scenario. It does not submit an update or create an approval batch.</div>
+        <h3>Vendor arrival time</h3>
+        <div id="review-arrival" class="arrival-comparison"></div>
+        <h3>Schedule impact · before and after</h3>
+        <div id="review-setup" class="review-setup"></div>
+        <div id="review-uncertainty"></div>
+        <div class="review-table-wrap">
+          <table>
+            <thead>
+              <tr><th>Scheduled task</th><th>Original overlap</th><th>Proposed overlap</th></tr>
+            </thead>
+            <tbody id="review-task-impacts"></tbody>
+          </table>
+        </div>
+        <div class="review-actions">
+          <button id="approve" class="integration-button" type="button" disabled>Approve proposed arrival</button>
+          <button id="reject" class="integration-button" type="button" disabled>Reject proposed change</button>
+        </div>
+        <p id="approval-state" class="note approval-state">Approval is available only after a valid combined analysis and explicit human review.</p>
+      </section>
+
+      <section class="card" aria-labelledby="future-boundaries-heading">
+        <h2 id="future-boundaries-heading">Future integration boundaries</h2>
+        <div class="integration-grid">
+          <div class="integration-boundary">
+            <strong>Readiness findings</strong>
+            <span class="note">Not connected. No Readiness payload or behavior is assumed here.</span>
+          </div>
+          <div class="integration-boundary">
+            <strong>Vendor Follow-up draft</strong>
+            <span class="note">Not connected. No draft message or sending behavior is implemented.</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const arrivalInput = document.getElementById("arrival-time");
+    const analyzeButton = document.getElementById("analyze");
+    const approveButton = document.getElementById("approve");
+    const rejectButton = document.getElementById("reject");
+    const approvalState = document.getElementById("approval-state");
+    const comparison = document.getElementById("comparison");
+    const content = document.getElementById("content");
+    const errorBox = document.getElementById("error");
+
+    function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+    function text(value) { return value === null || value === undefined || value === "" ? "Not provided" : String(value); }
+    function time(value) { return value ? value.slice(0, 5) : "Not provided"; }
+    function minutes(value) { return value === null || value === undefined ? "Not calculated" : `${Number(value.toFixed(2))} min`; }
+    function list(node, values, emptyText) {
+      clear(node);
+      if (!values || values.length === 0) { node.textContent = emptyText; return; }
+      const ul = document.createElement("ul");
+      values.forEach(value => { const li = document.createElement("li"); li.textContent = value; ul.appendChild(li); });
+      node.appendChild(ul);
+    }
+    function showComparison(vendor) {
+      clear(comparison);
+      [
+        ["Original arrival", vendor.original_arrival_time, ""],
+        ["Proposed arrival", vendor.proposed_arrival_time, " proposed"]
+      ].forEach(([label, value, extra]) => {
+        const box = document.createElement("div");
+        box.className = "arrival-box" + extra;
+        const title = document.createElement("div"); title.className = "meta"; title.textContent = label;
+        const val = document.createElement("div"); val.className = "value"; val.textContent = time(value);
+        box.append(title, val); comparison.appendChild(box);
+      });
+      comparison.hidden = false;
+    }
+    function render(data) {
+      errorBox.hidden = true; content.hidden = false;
+      const event = data.event; const vendor = event.vendor;
+      showComparison(vendor);
+      document.getElementById("event-title").textContent = event.name;
+      document.getElementById("event-meta").textContent = `${event.event_date} · starts ${time(event.start_time)}`;
+      document.getElementById("vendor-meta").textContent = `${vendor.name} · setup duration ${vendor.setup_duration_minutes} minutes`;
+      const tasks = document.getElementById("tasks"); clear(tasks);
+      event.tasks.forEach(task => {
+        const item = document.createElement("div"); item.className = "task";
+        const name = document.createElement("div"); name.className = "value"; name.textContent = `${task.name} (${task.task_id})`;
+        const timing = document.createElement("div"); timing.className = "task-time"; timing.textContent = `${time(task.start_time)} – ${time(task.end_time)}`;
+        item.append(name, timing); tasks.appendChild(item);
+      });
+      const overlap = data.overlap; const overlapBox = document.getElementById("overlap-result"); clear(overlapBox);
+      const line = document.createElement("div"); line.className = "result-line";
+      const badge = document.createElement("span"); badge.className = `status ${overlap.status}`; badge.textContent = overlap.status.replace("_", " ");
+      line.appendChild(badge); overlapBox.appendChild(line);
+      const windowText = document.createElement("p"); windowText.textContent = `Setup window: ${time(overlap.setup_start)} – ${time(overlap.setup_end)}`; overlapBox.appendChild(windowText);
+      const overlaps = document.createElement("div"); overlaps.className = "meta"; overlaps.textContent = "Task overlap durations (calculated)"; overlapBox.appendChild(overlaps);
+      const overlapList = document.createElement("div"); overlapBox.appendChild(overlapList);
+      list(overlapList, overlap.overlap_minutes_by_task.map(item =>
+        `${item.task_id}: ${Number(item.minutes.toFixed(2))} min`), "None");
+      if (overlap.setup_minutes_after_event_start !== null) {
+        const afterStart = document.createElement("p");
+        afterStart.textContent = `Setup after event start: ${Number(overlap.setup_minutes_after_event_start.toFixed(2))} min`;
+        overlapBox.appendChild(afterStart);
+      }
+      if (overlap.incomplete_task_ids.length) {
+        const incomplete = document.createElement("div"); incomplete.className = "unknown"; incomplete.textContent = `Incomplete timing: ${overlap.incomplete_task_ids.join(", ")}`; overlapBox.appendChild(incomplete);
+      }
+      if (overlap.reason) { const reason = document.createElement("p"); reason.className = "note"; reason.textContent = overlap.reason; overlapBox.appendChild(reason); }
+
+      const planning = data.planning; const planningBox = document.getElementById("planning-result"); clear(planningBox);
+      if (planning.status !== "ok") { planningBox.textContent = planning.error ? planning.error.message : "Combined analysis unavailable."; return; }
+      const findings = document.createElement("h3"); findings.textContent = "Planning findings"; planningBox.appendChild(findings);
+      const affected = document.createElement("p"); affected.textContent = `Affected task IDs: ${planning.affected_task_ids.length ? planning.affected_task_ids.join(", ") : "None"}`; planningBox.appendChild(affected);
+      if (!planning.scheduling_risks.length) { const noRisks = document.createElement("p"); noRisks.className = "note"; noRisks.textContent = "No scheduling risks reported by the simulated Planning response."; planningBox.appendChild(noRisks); }
+      planning.scheduling_risks.forEach(risk => {
+        const riskBox = document.createElement("div"); riskBox.className = "risk";
+        const title = document.createElement("strong"); title.textContent = risk.type; riskBox.appendChild(title);
+        const desc = document.createElement("p"); desc.textContent = risk.description; riskBox.appendChild(desc);
+        const evidence = document.createElement("div"); evidence.className = "evidence"; evidence.textContent = "Evidence: " + risk.evidence.map(item => `${item.source}${item.id ? ":" + item.id : ""}.${item.field}`).join(" · "); riskBox.appendChild(evidence);
+        planningBox.appendChild(riskBox);
+      });
+      if (planning.unknowns.length) { const unknown = document.createElement("div"); unknown.className = "unknown"; unknown.textContent = "Unknown information: " + planning.unknowns.join(" "); planningBox.appendChild(unknown); }
+      const recommendation = document.createElement("p"); recommendation.textContent = "Coordinator review: " + planning.recommendation.action; planningBox.appendChild(recommendation);
+
+      const review = data.review;
+      const reviewArrival = document.getElementById("review-arrival"); clear(reviewArrival);
+      [["Current event", review.original_arrival_time, ""], ["Proposed scenario", review.proposed_arrival_time, " proposed"]].forEach(([label, value, extra]) => {
+        const box = document.createElement("div"); box.className = "arrival-box" + extra;
+        const title = document.createElement("div"); title.className = "meta"; title.textContent = label;
+        const val = document.createElement("div"); val.className = "value"; val.textContent = time(value);
+        box.append(title, val); reviewArrival.appendChild(box);
+      });
+      const reviewSetup = document.getElementById("review-setup"); clear(reviewSetup);
+      [["Original", review.original, ""], ["Proposed", review.proposed, " proposed"]].forEach(([label, setup, extra]) => {
+        const box = document.createElement("div"); box.className = "setup-box" + extra;
+        const title = document.createElement("div"); title.className = "meta"; title.textContent = label;
+        const window = document.createElement("div"); window.className = "value"; window.textContent = `Setup window: ${time(setup.setup_start)} – ${time(setup.setup_end)}`;
+        const after = document.createElement("div"); after.className = "note"; after.textContent = `After event starts: ${minutes(setup.setup_minutes_after_event_start)}`;
+        box.append(title, window, after); reviewSetup.appendChild(box);
+      });
+      const uncertainty = document.getElementById("review-uncertainty"); clear(uncertainty);
+      if (review.proposed.incomplete_task_ids.length || review.proposed.status === "unknown") {
+        const message = document.createElement("div"); message.className = "unknown";
+        message.textContent = review.proposed.incomplete_task_ids.length ? `Proposed scenario uncertainty: ${review.proposed.incomplete_task_ids.join(", ")}` : "Proposed scenario timing is unknown; no exact overlap was calculated.";
+        uncertainty.appendChild(message);
+      }
+      const impactRows = document.getElementById("review-task-impacts"); clear(impactRows);
+      review.task_impacts.forEach(impact => {
+        const row = document.createElement("tr");
+        const task = document.createElement("td"); task.textContent = `${impact.name} (${impact.task_id})`;
+        const original = document.createElement("td"); original.textContent = minutes(impact.original_overlap_minutes);
+        const proposed = document.createElement("td"); proposed.textContent = minutes(impact.proposed_overlap_minutes);
+        row.append(task, original, proposed); impactRows.appendChild(row);
+      });
+      const approval = data.approval || {};
+      approveButton.disabled = !approval.can_approve;
+      rejectButton.disabled = !approval.can_reject;
+      approvalState.className = "note approval-state";
+      approvalState.textContent = approval.reason || "Approval is unavailable.";
+    }
+    async function analyze() {
+      analyzeButton.disabled = true; errorBox.hidden = true;
+      try {
+        const response = await fetch("/api/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ proposed_arrival_time: arrivalInput.value || null }) });
+        const data = await response.json();
+        if (!response.ok || data.status === "error") throw new Error(data.error ? data.error.message : "Combined analysis failed. Try again.");
+        render(data);
+      } catch (error) { content.hidden = true; comparison.hidden = true; errorBox.textContent = error.message; errorBox.hidden = false; }
+      finally { analyzeButton.disabled = false; }
+    }
+    async function decide(decision) {
+      approveButton.disabled = true; rejectButton.disabled = true; errorBox.hidden = true;
+      try {
+        const response = await fetch("/api/decision", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision }) });
+        const data = await response.json();
+        if (!response.ok || data.status === "error") throw new Error(data.error ? data.error.message : "Decision could not be applied.");
+        arrivalInput.value = "";
+        await analyze();
+        approvalState.className = "approval-state success";
+        approvalState.textContent = data.message;
+      } catch (error) {
+        content.hidden = false;
+        errorBox.textContent = error.message;
+        errorBox.hidden = false;
+        approveButton.disabled = true;
+        rejectButton.disabled = true;
+      }
+    }
+    arrivalInput.addEventListener("input", () => {
+      approveButton.disabled = true;
+      rejectButton.disabled = true;
+      approvalState.className = "note approval-state";
+      approvalState.textContent = "Analyze the proposed time before making a decision.";
+    });
+    analyzeButton.addEventListener("click", analyze);
+    approveButton.addEventListener("click", () => decide("approve"));
+    rejectButton.addEventListener("click", () => decide("reject"));
+    analyze();
+  </script>
+</body>
+</html>

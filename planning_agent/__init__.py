@@ -1,0 +1,87 @@
+"""Planning Agent foundation, universal configuration, and provider boundary."""
+
+from .calculations import OverlapResult, calculate_setup_overlap
+from .configuration import (
+    CompiledOperationalScenario,
+    ConfigurationError,
+    ConfiguredActivity,
+    ConfiguredOperationalChange,
+    ConfiguredResource,
+    ConfiguredSourceRecord,
+    EvidenceReference,
+    EvidenceValidationResult,
+    OperationalScenarioConfig,
+    compile_operational_scenario,
+    validate_evidence_references,
+)
+from .models import (
+    Event,
+    EventTask,
+    FrozenEventSnapshot,
+    ProposedVendorArrivalChange,
+    Vendor,
+)
+from .planning_contract import (
+    PLANNING_AGENT_INSTRUCTIONS,
+    PLANNING_CONTRACT_VERSION,
+    PlanningResponseValidationError,
+    planning_error_response,
+    validate_planning_response,
+)
+from .planning_service import PlanningAgent, build_planning_input
+from .provider import (
+    APPROVED_PROVIDER_HOSTNAMES,
+    ANTHROPIC_API_ENDPOINT,
+    ANTHROPIC_DEFAULT_MODEL,
+    ANTHROPIC_PROVIDER_HOSTNAMES,
+    AnthropicPlanningProvider,
+    PlanningProvider,
+    PlanningProviderAuthenticationError,
+    PlanningProviderError,
+    PlanningProviderTimeout,
+    PlanningProviderUnavailable,
+    HttpPlanningProvider,
+    UnconfiguredPlanningProvider,
+)
+from .snapshot import create_frozen_snapshot
+
+__all__ = [
+    "Event",
+    "EventTask",
+    "FrozenEventSnapshot",
+    "OverlapResult",
+    "ProposedVendorArrivalChange",
+    "Vendor",
+    "calculate_setup_overlap",
+    "create_frozen_snapshot",
+    "CompiledOperationalScenario",
+    "ConfigurationError",
+    "ConfiguredActivity",
+    "ConfiguredOperationalChange",
+    "ConfiguredResource",
+    "ConfiguredSourceRecord",
+    "EvidenceReference",
+    "EvidenceValidationResult",
+    "OperationalScenarioConfig",
+    "compile_operational_scenario",
+    "validate_evidence_references",
+    "PLANNING_AGENT_INSTRUCTIONS",
+    "PLANNING_CONTRACT_VERSION",
+    "PlanningResponseValidationError",
+    "planning_error_response",
+    "validate_planning_response",
+    "PlanningAgent",
+    "build_planning_input",
+    "PlanningProvider",
+    "APPROVED_PROVIDER_HOSTNAMES",
+    "ANTHROPIC_API_ENDPOINT",
+    "ANTHROPIC_DEFAULT_MODEL",
+    "ANTHROPIC_PROVIDER_HOSTNAMES",
+    "AnthropicPlanningProvider",
+    "PlanningProviderError",
+    "PlanningProviderAuthenticationError",
+    "PlanningProviderTimeout",
+    "PlanningProviderUnavailable",
+    "HttpPlanningProvider",
+    "UnconfiguredPlanningProvider",
+]
