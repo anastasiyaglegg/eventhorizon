@@ -38,6 +38,11 @@ export function decide(session: EventSession, decision: "approve" | "reject"): E
   if (session.status !== "review-ready" || !session.pending || !session.review) {
     throw new Error("Analyze the proposed arrival successfully before deciding.");
   }
+  // A missing proposed arrival can be analyzed (it is reported as unknown) but never applied,
+  // because approving it would erase the vendor's current arrival time.
+  if (decision === "approve" && session.pending.arrival === null) {
+    throw new Error("Enter a proposed arrival time before approving.");
+  }
   const event = structuredClone(session.event);
   if (decision === "approve") event.vendor.arrival_time = session.pending.arrival;
   return { event, status: decision === "approve" ? "approved" : "rejected",

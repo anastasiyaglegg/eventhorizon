@@ -40,7 +40,7 @@ live response failed schema validation; enabling structured JSON output resolved
 ## Handoff to Crystal
 
 The starting structure follows her November 5 Slack corrections:
-proposed_change is inside snapshot, times use HH:MM:SS or null, and the output
+proposed_change is inside snapshot, times use HH:MM:00 or null, and the output
 keeps affected_task_ids, scheduling_risks, unknowns, and recommendation.
 Display only HH:MM in the coordinator interface.
 
@@ -65,7 +65,8 @@ with her unpublished code.
   through failAnalysis. decide requires review-ready state and applies the
   arrival only on approval. These helpers are intended for React state.
 - The request ID is a client correlation token. Durable snapshot versions and
-  approval endpoints are outside this local-session implementation.
+  approval endpoints are outside this local-session implementation. A null
+  proposed arrival can be analyzed and rejected, but decide refuses to approve it.
 
 ## Scope and collaboration
 

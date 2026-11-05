@@ -105,6 +105,23 @@ test("session approval requires a current successful report and applies at most 
   assert.throws(() => decide(clearProposal(ready), "approve"));
 });
 
+test("a missing proposed arrival can be reviewed and rejected but never approved", async () => {
+  const input = structuredClone(seededInput);
+  input.snapshot.proposed_change.proposed_arrival_time = null;
+  const packet = await analyze(input, async (_, calculation) => fixture(calculation));
+  const ready = receiveAnalysis(beginAnalysis(createSession(input.snapshot.event), null, "request-1"), "request-1", packet);
+  assert.equal(ready.status, "review-ready");
+  assert.throws(() => decide(ready, "approve"), /proposed arrival time/);
+  assert.equal(decide(ready, "reject").event.vendor.arrival_time, "16:00:00");
+});
+
+test("times with non-zero seconds are rejected before the model call", async () => {
+  const input = structuredClone(seededInput);
+  input.snapshot.proposed_change.proposed_arrival_time = "17:00:30";
+  await assert.rejects(analyze(input, async () => assert.fail("must not call provider")),
+    (error: AnalysisError) => error.code === "invalid_input");
+});
+
 test("editing while a request is pending prevents an older response from enabling approval", async () => {
   const packet = await analyze(seededInput, async (_, calculation) => fixture(calculation));
   const pending = beginAnalysis(createSession(seededInput.snapshot.event), "17:00:00", "request-1");
