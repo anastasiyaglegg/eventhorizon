@@ -118,5 +118,41 @@
     "contactEmail": "events@morningslate.example",
     "rating": 4.7,
     "review": "The portrait setup was quick and the coverage felt natural."
+  },
+  {
+    "id": "bakery-1",
+    "name": "Hearth & Harbor Bakery",
+    "service": "bakery",
+    "borough": "Brooklyn",
+    "capacity": 100,
+    "samplePrice": 480,
+    "details": "Sourdough loaves, dinner rolls, and bread baskets.",
+    "contactEmail": "events@hearthharbor.example",
+    "rating": 4.8,
+    "review": "The bread baskets arrived fresh and ready to serve."
+  },
+  {
+    "id": "bakery-2",
+    "name": "Golden Crumb Bakeshop",
+    "service": "bakery",
+    "borough": "Queens",
+    "capacity": 80,
+    "samplePrice": 350,
+    "details": "Dinner rolls and sliced sandwich bread for group orders.",
+    "contactEmail": "events@goldencrumb.example",
+    "rating": 4.7,
+    "review": "The rolls were a hit and the portions matched our guest count."
+  },
+  {
+    "id": "bakery-3",
+    "name": "Bramble Oven Bakery",
+    "service": "bakery",
+    "borough": "Manhattan",
+    "capacity": 140,
+    "samplePrice": 620,
+    "details": "Focaccia trays and assorted artisan bread for receptions.",
+    "contactEmail": "events@brambleoven.example",
+    "rating": 4.9,
+    "review": "The focaccia was easy to serve and held up well through the reception."
   }
 ]

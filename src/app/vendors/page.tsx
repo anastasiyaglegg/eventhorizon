@@ -6,7 +6,7 @@ import { samplePrice, searchVendors, type VendorCriteria, type Vendor } from "..
 
 const example = "Find a caterer in Brooklyn for 80 guests under $3,000";
 const categoryIcons: Record<string, string> = {
-  catering: "🍴", venue: "🏛️", AV: "🎛️", photography: "📷",
+  catering: "🍴", bakery: "🥖", venue: "🏛️", AV: "🎛️", photography: "📷",
 };
 
 type Turn = { query: string; message: string; matches: Vendor[] };
@@ -37,7 +37,7 @@ export default function VendorFinder() {
         <div>
           <p className="eyebrow">Event Horizon</p>
           <h1>Vendor finder</h1>
-          <p className="subtitle">Find sample caterers, venues, AV providers, and photographers.</p>
+          <p className="subtitle">Find sample caterers, bakeries, venues, AV providers, and photographers.</p>
         </div>
         <span className="status-pill">Synthetic directory</span>
       </header>

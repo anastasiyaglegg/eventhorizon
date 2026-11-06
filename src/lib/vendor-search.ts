@@ -1,6 +1,7 @@
 import directory from "../data/vendors.json";
 
 const services = [
+  { name: "bakery", pattern: /\b(?:bread|bakery|bakeries|baker|dinner rolls?|sourdough|focaccia)\b/i },
   { name: "catering", pattern: /\b(?:caterer(?:s)?|catering|food)\b/i },
   { name: "venue", pattern: /\b(?:venue(?:s)?|event space)\b/i },
   { name: "AV", pattern: /\b(?:av|audio[ -]?visual|sound|lighting)\b/i },
@@ -38,15 +39,13 @@ export function searchVendors(query: string, previous: VendorCriteria) {
   if (places[0]) next.borough = places[0];
   if (guestCount) next.guests = Number(guestCount[1].replaceAll(",", ""));
   if (budget) next.budget = Number(budget[1].replaceAll(",", "")) * (budget[2] ? 1000 : 1);
-  if (!next.service || !next.borough) {
-    return { criteria: next, message: !next.service
-      ? "What service do you need: catering, a venue, AV, or photography?"
-      : "Which borough should I search: Brooklyn, Manhattan, or Queens?", matches: [] };
+  if (!next.service) {
+    return { criteria: next, message: "What service do you need: catering, a bakery, a venue, AV, or photography?", matches: [] };
   }
 
   const matches = directory.filter(vendor =>
     vendor.service === next.service &&
-    vendor.borough === next.borough &&
+    (next.borough === undefined || vendor.borough === next.borough) &&
     (next.guests === undefined || (vendor.capacity !== null && vendor.capacity >= next.guests)) &&
     (next.budget === undefined || (vendor.samplePrice !== null && vendor.samplePrice <= next.budget)),
   ).sort((a, b) => (a.samplePrice ?? Infinity) - (b.samplePrice ?? Infinity)).slice(0, 3);
