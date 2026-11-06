@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  analysisInputSchema,
-  type ReviewPacket,
-} from "../lib/contract";
+import { analysisInputSchema } from "../lib/contract";
+import { requestAnalysis } from "../client/analysis-api";
 import {
   beginAnalysis,
   clearProposal,
@@ -96,24 +94,14 @@ export default function Home() {
 
     try {
       const input = buildAnalysisInput(pending.event, proposedArrival);
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(input),
-      });
-      const payload = await response.json() as ReviewPacket & ApiErrorPayload;
-      if (!response.ok || !payload.analysis) {
-        setSession((current) =>
-          current ? failAnalysis(current, requestId, safeErrorMessage(payload)) : current,
-        );
-        return;
-      }
+      const packet = await requestAnalysis(input);
       setSession((current) =>
-        current ? receiveAnalysis(current, requestId, payload) : current,
+        current ? receiveAnalysis(current, requestId, packet) : current,
       );
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Analysis could not finish. Please retry.";
       setSession((current) =>
-        current ? failAnalysis(current, requestId, "Analysis could not finish. Please retry.") : current,
+        current ? failAnalysis(current, requestId, message) : current,
       );
     } finally {
       setBusy(false);
@@ -189,14 +177,17 @@ export default function Home() {
 
       <section className="panel">
         <h2>Propose a vendor arrival</h2>
-        <p className="helper">Leave the field blank to test missing-arrival handling. Times use whole minutes in the event’s local time zone.</p>
+        <p className="helper" id="arrival-help">Enter 24-hour time in HH:MM format, such as 17:00, using the event’s local time zone. Leave blank if the arrival is unknown.</p>
         <div className="arrival-form">
           <div className="field">
             <label htmlFor="proposed-arrival">Proposed arrival</label>
             <input
               id="proposed-arrival"
-              type="time"
-              step="60"
+              type="text"
+              autoComplete="off"
+              placeholder="17:00"
+              maxLength={5}
+              aria-describedby="arrival-help"
               value={arrivalInput}
               onChange={(eventChange) => updateArrival(eventChange.target.value)}
             />

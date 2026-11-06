@@ -29,7 +29,8 @@ test("review helpers present normal and late deterministic cases", () => {
   assert.equal(late.setup_finish, "2026-11-20T18:30:00.000-05:00");
   assert.equal(late.overlap_minutes, 30);
   assert.deepEqual(late.affected_task_ids, ["catering-ready"]);
-  assert.equal(formatClock(late.setup_finish), "6:30 PM");
+  assert.equal(formatClock(late.setup_finish), "18:30");
+  assert.equal(formatClock("00:00:00"), "00:00");
 });
 
 test("review helpers keep missing arrival unknown and enforce whole minutes", () => {
@@ -40,5 +41,5 @@ test("review helpers keep missing arrival unknown and enforce whole minutes", ()
   assert.match(missing.unknowns[0], /arrival/);
   assert.equal(normalizeArrivalInput("17:00"), "17:00:00");
   assert.equal(normalizeArrivalInput(""), null);
-  assert.throws(() => normalizeArrivalInput("17:00:30"), /whole-minute/);
+  assert.throws(() => normalizeArrivalInput("17:00:30"), /HH:MM/);
 });

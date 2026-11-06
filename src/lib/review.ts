@@ -5,7 +5,7 @@ const wholeMinuteInput = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 export function normalizeArrivalInput(value: string): string | null {
   if (!value) return null;
   if (!wholeMinuteInput.test(value)) {
-    throw new Error("Enter a valid whole-minute arrival time.");
+    throw new Error("Enter a valid 24-hour arrival time in HH:MM format, such as 17:00.");
   }
   return `${value}:00`;
 }
@@ -18,10 +18,7 @@ export function formatClock(value: string | null): string {
   if (!value) return "Unknown";
   const match = value.match(/(?:^|T)(\d{2}):(\d{2})/);
   if (!match) return "Unknown";
-  const hour = Number(match[1]);
-  const suffix = hour >= 12 ? "PM" : "AM";
-  const displayHour = hour % 12 || 12;
-  return `${displayHour}:${match[2]} ${suffix}`;
+  return match[1] + ":" + match[2];
 }
 
 export function formatMinutes(value: number | null): string {
