@@ -1,0 +1,91 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import Link from "next/link";
+import { samplePrice, searchVendors, type VendorCriteria, type Vendor } from "../../lib/vendor-search";
+
+const example = "Find a caterer in Brooklyn for 80 guests under $3,000";
+const categoryIcons: Record<string, string> = {
+  catering: "🍴", venue: "🏛️", AV: "🎛️", photography: "📷",
+};
+
+type Turn = { query: string; message: string; matches: Vendor[] };
+
+export default function VendorFinder() {
+  const [query, setQuery] = useState("");
+  const [criteria, setCriteria] = useState<VendorCriteria>({});
+  const [turns, setTurns] = useState<Turn[]>([]);
+
+  function search(text: string) {
+    const prompt = text.trim();
+    if (!prompt) return;
+    const result = searchVendors(prompt, criteria);
+    setCriteria(result.criteria);
+    setTurns(current => [...current, { query: prompt, message: result.message, matches: result.matches }]);
+    setQuery("");
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    search(query);
+  }
+
+  return (
+    <main className="page-shell vendor-finder">
+      <Link href="/">← Event review</Link>
+      <header className="page-heading vendor-finder-heading">
+        <div>
+          <p className="eyebrow">Event Horizon</p>
+          <h1>Vendor finder</h1>
+          <p className="subtitle">Find sample caterers, venues, AV providers, and photographers.</p>
+        </div>
+        <span className="status-pill">Synthetic directory</span>
+      </header>
+      <section className="panel" aria-labelledby="search-heading">
+        <h2 id="search-heading">What do you need for your event?</h2>
+        <p className="helper">Vendors, contacts, prices, ratings, and reviews are fictional. Availability is unknown.</p>
+        <button className="secondary-button vendor-example" type="button" onClick={() => search(example)}>
+          {example}
+        </button>
+        <div role="log" aria-label="Vendor search conversation">
+          {turns.map((turn, index) => (
+            <div className="vendor-turn" key={index}>
+              <p><strong>You:</strong> {turn.query}</p>
+              <p><strong>Vendor finder:</strong> {turn.message}</p>
+              {turn.matches.length > 0 && <ul className="vendor-results">
+                {turn.matches.map(vendor => <li className="fact" key={vendor.id}>
+                  <div className="vendor-card-heading">
+                    <div>
+                      <p className="eyebrow"><span aria-hidden="true">{categoryIcons[vendor.service]}</span> {vendor.service} · {vendor.borough}</p>
+                      <h3>{vendor.name}</h3>
+                    </div>
+                    <span className="tag good"><span aria-hidden="true">★&nbsp;</span> {vendor.rating.toFixed(1)} / 5 sample rating</span>
+                  </div>
+                  <p>{vendor.details}</p>
+                  <p className="helper">Sample price {samplePrice(vendor)} · Capacity {vendor.capacity ?? "Unknown"} · Availability unknown</p>
+                  <p className="helper">Sample contact <span className="vendor-contact">{vendor.contactEmail}</span></p>
+                  <blockquote className="vendor-review">
+                    <span className="fact-label">Sample review</span>
+                    <p>“{vendor.review}”</p>
+                  </blockquote>
+                </li>)}
+              </ul>}
+            </div>
+          ))}
+        </div>
+        <form className="vendor-form" onSubmit={submit}>
+          <label className="field">
+            Your vendor request
+            <input value={query} onChange={event => setQuery(event.target.value)} maxLength={300}
+              placeholder={turns.length ? "Try a different borough or budget" : "Describe the vendor you need"} />
+          </label>
+          <div className="decision-row">
+            <button className="primary-button" disabled={!query.trim()}>Find vendors</button>
+            <button className="secondary-button" type="button" disabled={!turns.length}
+              onClick={() => { setTurns([]); setCriteria({}); setQuery(""); }}>New search</button>
+          </div>
+        </form>
+      </section>
+    </main>
+  );
+}
