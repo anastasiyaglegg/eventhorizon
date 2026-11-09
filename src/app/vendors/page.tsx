@@ -63,6 +63,7 @@ export default function VendorFinder() {
           <p className="eyebrow">Event Horizon</p>
           <h1>Vendor finder</h1>
           <p className="subtitle">Find caterers, bakeries, venues, AV providers, and photographers.</p>
+          <p className="scope-note"><strong>Stretch feature</strong> · Separate from the core P0 demo. Recovery Engine is the first stretch priority.</p>
         </div>
         <span className="status-pill">{directorySource === "supabase" ? "Supabase directory" : "Sample directory"}</span>
       </header>

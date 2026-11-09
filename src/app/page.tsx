@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { analysisInputSchema } from "../lib/contract";
 import { requestAnalysis } from "../client/analysis-api";
@@ -151,7 +150,7 @@ export default function Home() {
             combined AI analysis call; exact timing stays calculated in application code.
           </p>
         </div>
-        <Link className="status-pill" href="/vendors">Vendor finder →</Link>
+        <span className="status-pill">Core P0 · Planning/readiness</span>
       </header>
 
       <section className="panel">

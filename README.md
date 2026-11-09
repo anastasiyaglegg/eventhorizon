@@ -33,11 +33,13 @@ compatible with the configured model. The API key stays on the server.
 
 ## Vendor directory
 
-The vendor finder at `/vendors` uses the fictional JSON directory unless both
-`SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` are set in `.env.local`. When configured,
-`GET /api/vendors` reads the public `vendors` table using the publishable key and relies
-on its row-level security policy. Do not put a Supabase service-role key in the
-app. The expected columns are `id`, `name`, `category`, `borough`, `description`,
+The vendor finder at `/vendors` is a stretch feature, separate from the core P0
+Planning/Readiness demo. Recovery Engine remains the first stretch priority. It uses
+the fictional JSON directory unless both `SUPABASE_URL` and
+`SUPABASE_PUBLISHABLE_KEY` are set in `.env.local`. When configured, `GET /api/vendors`
+reads the public `vendors` table using the publishable key and relies on its row-level
+security policy. Do not put a Supabase service-role key in the app. The expected columns
+are `id`, `name`, `category`, `borough`, `description`,
 `contact_email`, `price_min`, `price_max`, `capacity_min`, `capacity_max`, `rating`, `review_count`,
 `review_summary`, `source_url`, and `is_synthetic`. Prices, capacity, ratings,
 reviews, and availability should remain unknown unless verified.

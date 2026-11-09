@@ -100,6 +100,7 @@ p { line-height: 1.55; }
 
 .vendor-finder { max-width: 860px; }
 .vendor-finder-heading { margin-top: 22px; }
+.scope-note { color: var(--muted); font-size: 0.9rem; margin: 12px 0 0; }
 .vendor-example { margin-top: 16px; text-align: left; }
 .vendor-turn { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; overflow-wrap: anywhere; }
 .vendor-results { padding: 0; list-style: none; display: grid; gap: 10px; }
