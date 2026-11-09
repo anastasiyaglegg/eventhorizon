@@ -1,13 +1,30 @@
 import { z } from "zod";
-import type { Vendor } from "../../../lib/vendor-search";
+import { normalizeVendorService, type Vendor } from "../../../lib/vendor-search";
+
+const nullableEmail = z.preprocess(
+  value => typeof value === "string" && value.trim() === "" ? null : value,
+  z.string().trim().email().nullable(),
+);
+const safeSourceUrl = z.preprocess(
+  value => typeof value === "string" && value.trim() === "" ? null : value,
+  z.string().url().nullable().refine(value => {
+    if (value === null) return true;
+    try {
+      const protocol = new URL(value).protocol;
+      return protocol === "http:" || protocol === "https:";
+    } catch {
+      return false;
+    }
+  }),
+);
 
 const vendorRow = z.object({
-  id: z.string().uuid(),
+  id: z.string().trim().min(1),
   name: z.string().min(1),
   category: z.string().min(1),
   borough: z.string().min(1).nullable(),
   description: z.string().nullable(),
-  contact_email: z.string().email().nullable(),
+  contact_email: nullableEmail,
   price_min: z.number().nonnegative().nullable(),
   price_max: z.number().nonnegative().nullable(),
   capacity_min: z.number().int().positive().nullable(),
@@ -15,17 +32,15 @@ const vendorRow = z.object({
   rating: z.number().min(0).max(5).nullable(),
   review_count: z.number().int().nonnegative(),
   review_summary: z.string().nullable(),
-  source_url: z.string().url().nullable(),
-  is_synthetic: z.boolean(),
+  source_url: safeSourceUrl,
+  is_synthetic: z.preprocess(value => value ?? true, z.boolean()),
 });
-
-const vendorRows = z.array(vendorRow);
 
 function toVendor(row: z.infer<typeof vendorRow>): Vendor {
   return {
     id: row.id,
     name: row.name,
-    service: row.category,
+    service: normalizeVendorService(row.category),
     borough: row.borough ?? "Unknown",
     capacityMin: row.capacity_min,
     capacityMax: row.capacity_max,
@@ -71,10 +86,26 @@ export async function GET() {
     return Response.json({ error: "Supabase could not return vendor records." }, { status: 502 });
   }
 
-  const parsed = vendorRows.safeParse(await response.json());
-  if (!parsed.success) {
-    return Response.json({ error: "Supabase returned vendor records in an unexpected format." }, { status: 502 });
+  let rawRows: unknown;
+  try {
+    rawRows = await response.json();
+  } catch {
+    return Response.json({ error: "Supabase returned an unreadable vendor response." }, { status: 502 });
+  }
+  if (!Array.isArray(rawRows)) return Response.json({ error: "Supabase returned an unexpected vendor response." }, { status: 502 });
+  if (rawRows.length === 0) return Response.json({ source: "sample", vendors: [] });
+
+  const vendors: Vendor[] = [];
+  let invalidCount = 0;
+  for (const rawRow of rawRows) {
+    const parsed = vendorRow.safeParse(rawRow);
+    if (parsed.success) vendors.push(toVendor(parsed.data));
+    else invalidCount++;
   }
 
-  return Response.json({ source: "supabase", vendors: parsed.data.map(toVendor) });
+  const warning = invalidCount
+    ? `${invalidCount} vendor ${invalidCount === 1 ? "record was" : "records were"} skipped because its data was invalid.`
+    : undefined;
+
+  return Response.json({ source: "supabase", vendors, warning });
 }

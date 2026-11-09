@@ -7,7 +7,7 @@ const services = [
   { name: "AV", pattern: /\b(?:av|audio[ -]?visual|sound|lighting)\b/i },
   { name: "photography", pattern: /\b(?:photo(?:graphy|grapher)?s?)\b/i },
 ];
-const boroughs = ["Brooklyn", "Manhattan", "Queens"];
+const boroughs = ["Brooklyn", "Manhattan", "Queens", "Bronx", "Staten Island"];
 const dollars = new Intl.NumberFormat("en-US", {
   style: "currency", currency: "USD", maximumFractionDigits: 0,
 });
@@ -30,11 +30,26 @@ export type Vendor = {
   sourceUrl: string | null;
 };
 export type VendorCriteria = { service?: string; borough?: string; guests?: number; budget?: number };
+export type VendorSearchResult = {
+  criteria: VendorCriteria;
+  message: string;
+  matches: Vendor[];
+  possibleMatches: Vendor[];
+};
+
+export function normalizeVendorService(service: string) {
+  const normalized = service.trim().toLocaleLowerCase("en-US");
+  if (["caterer", "caterers", "food"].includes(normalized)) return "catering";
+  if (["baker", "bakers", "bakeries"].includes(normalized)) return "bakery";
+  if (["audio visual", "audio-visual", "sound", "lighting"].includes(normalized)) return "av";
+  if (["photo", "photographer", "photographers", "photo services"].includes(normalized)) return "photography";
+  return normalized;
+}
 
 export const sampleVendors: Vendor[] = directory.map((vendor) => ({
   id: vendor.id,
   name: vendor.name,
-  service: vendor.service,
+  service: normalizeVendorService(vendor.service),
   borough: vendor.borough,
   capacityMin: null,
   capacityMax: vendor.capacity,
@@ -60,35 +75,49 @@ export function describeCriteria(criteria: VendorCriteria) {
 export function searchVendors(query: string, previous: VendorCriteria, vendors: Vendor[] = sampleVendors) {
   const next = { ...previous };
   const service = services.find(({ pattern }) => pattern.test(query));
-  const places = boroughs.filter(borough => new RegExp(`\\b${borough}\\b`, "i").test(query));
+  const places = boroughs.filter(borough => new RegExp(`\\b${borough.replace(" ", "\\s+")}\\b`, "i").test(query));
   const guestCount = query.match(/\b([\d,]+)\s*(?:guests?|people|attendees?)\b/i);
   const budget = query.match(/(?:\$\s*|\bbudget(?:\s+(?:of|is))?\s+)([\d,]+(?:\.\d+)?)\s*(k\b)?/i);
-  if (places.length > 1 || (places.length === 0 && /\b(?:in|near)\s+[a-z]/i.test(query))) {
-    return { criteria: previous, message: "Choose one borough from the sample directory: Brooklyn, Manhattan, or Queens.", matches: [] };
+  if (places.length > 1) {
+    return { criteria: previous, message: `Choose one borough: ${boroughs.join(", ")}.`, matches: [], possibleMatches: [] };
   }
   if (!service && !places.length && !guestCount && !budget) {
-    return { criteria: previous, message: "Try a service, borough, guest count, or dollar budget, such as “catering in Brooklyn for 80 guests under $3,000.”", matches: [] };
+    return { criteria: previous, message: "Try a service, borough, guest count, or dollar budget, such as “catering in Brooklyn for 80 guests under $3,000.”", matches: [], possibleMatches: [] };
   }
-  if (service) next.service = service.name;
+  if (service) next.service = normalizeVendorService(service.name);
   if (places[0]) next.borough = places[0];
   if (guestCount) next.guests = Number(guestCount[1].replaceAll(",", ""));
   if (budget) next.budget = Number(budget[1].replaceAll(",", "")) * (budget[2] ? 1000 : 1);
   if (!next.service) {
-    return { criteria: next, message: "What service do you need: catering, a bakery, a venue, AV, or photography?", matches: [] };
+    return { criteria: next, message: "What service do you need: catering, a bakery, a venue, AV, or photography?", matches: [], possibleMatches: [] };
   }
 
-  const matches = vendors.filter(vendor =>
-    vendor.service === next.service &&
-    (next.borough === undefined || vendor.borough === next.borough) &&
-    (next.guests === undefined || (vendor.capacityMax !== null && vendor.capacityMax >= next.guests && (vendor.capacityMin === null || vendor.capacityMin <= next.guests))) &&
-    (next.budget === undefined || (vendor.priceMin !== null && vendor.priceMin <= next.budget)),
-  ).sort((a, b) => (a.priceMin ?? Infinity) - (b.priceMin ?? Infinity)).slice(0, 3);
+  const classified = vendors.flatMap((vendor) => {
+    if (normalizeVendorService(vendor.service) !== next.service) return [];
+    let uncertain = false;
+    if (next.borough !== undefined && vendor.borough !== next.borough) {
+      if (vendor.borough === "Unknown") uncertain = true;
+      else return [];
+    }
+    if (next.guests !== undefined) {
+      if (vendor.capacityMax === null) uncertain = true;
+      else if (vendor.capacityMax < next.guests || (vendor.capacityMin !== null && vendor.capacityMin > next.guests)) return [];
+    }
+    if (next.budget !== undefined) {
+      if (vendor.priceMin === null) uncertain = true;
+      else if (vendor.priceMin > next.budget) return [];
+    }
+    return [{ vendor, uncertain }];
+  }).sort((a, b) => (a.vendor.priceMin ?? Infinity) - (b.vendor.priceMin ?? Infinity));
+  const matches = classified.filter(item => !item.uncertain).slice(0, 3).map(item => item.vendor);
+  const possibleMatches = classified.filter(item => item.uncertain).slice(0, 3).map(item => item.vendor);
 
   return {
     criteria: next,
-    message: matches.length ? `Matches for ${describeCriteria(next)}.`
+    message: matches.length || possibleMatches.length ? `Matches for ${describeCriteria(next)}. Listings with missing details are shown as possible matches.`
       : `No matches for ${describeCriteria(next)}. Try a different borough or budget, or start a new search.`,
     matches,
+    possibleMatches,
   };
 }
 

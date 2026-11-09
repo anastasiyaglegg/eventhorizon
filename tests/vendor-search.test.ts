@@ -36,3 +36,23 @@ test("vendor search excludes records above the requested budget or capacity", ()
   const result = searchVendors("bakery in Brooklyn for 100 guests under $400", {}, [realVendor]);
   assert.equal(result.matches.length, 0);
 });
+
+test("ordinary place words and near-me requests do not trigger a borough prompt", () => {
+  for (const query of ["catering for a party in December", "photographer in a hurry", "find catering near me"]) {
+    const result = searchVendors(query, {});
+    assert.doesNotMatch(result.message, /Choose one borough/);
+  }
+});
+
+test("search accepts all five boroughs and normalizes imported category casing", () => {
+  const bronxVendor = { ...realVendor, id: "bronx-1", service: "Catering", borough: "Bronx" };
+  const result = searchVendors("catering in the Bronx", {}, [bronxVendor]);
+  assert.equal(result.matches[0].id, bronxVendor.id);
+});
+
+test("vendors with missing price or capacity remain visible as possible matches", () => {
+  const incomplete = { ...realVendor, priceMin: null, priceMax: null, capacityMin: null, capacityMax: null };
+  const result = searchVendors("bakery in Brooklyn for 80 guests under $600", {}, [incomplete]);
+  assert.equal(result.matches.length, 0);
+  assert.equal(result.possibleMatches[0].id, incomplete.id);
+});
