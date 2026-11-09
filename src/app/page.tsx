@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { analysisInputSchema } from "../lib/contract";
 import { requestAnalysis } from "../client/analysis-api";
+import { requestRecovery } from "../client/recovery-api";
+import type { RecoveryOutput } from "../lib/recovery-contract";
 import {
   beginAnalysis,
   clearProposal,
@@ -36,6 +38,10 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryPlan, setRecoveryPlan] = useState<RecoveryOutput | null>(null);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const recoveryRequestRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,8 +77,11 @@ export default function Home() {
   const canApprove = canReview && pendingArrival != null;
 
   function updateArrival(value: string) {
+    recoveryRequestRef.current++;
     setArrivalInput(value);
     setInputError(null);
+    setRecoveryPlan(null);
+    setRecoveryError(null);
     setSession((current) => current ? clearProposal(current) : current);
   }
 
@@ -87,8 +96,11 @@ export default function Home() {
     }
 
     const requestId = crypto.randomUUID();
+    recoveryRequestRef.current++;
     const pending = beginAnalysis(clearProposal(session), proposedArrival, requestId);
     setSession(pending);
+    setRecoveryPlan(null);
+    setRecoveryError(null);
     setBusy(true);
     setInputError(null);
 
@@ -105,6 +117,31 @@ export default function Home() {
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function draftRecoveryPlan() {
+    if (!session?.review || session.status !== "review-ready" || !session.pending?.requestId) return;
+    const requestToken = ++recoveryRequestRef.current;
+    setRecoveryBusy(true);
+    setRecoveryError(null);
+    setRecoveryPlan(null);
+    try {
+      const result = await requestRecovery({
+        contract_version: "recovery.v1",
+        run_id: crypto.randomUUID(),
+        source_run_id: session.pending.requestId,
+        event: session.event,
+        proposed_arrival_time: session.review.proposed_arrival_time,
+        analysis: session.review.analysis,
+      });
+      if (requestToken === recoveryRequestRef.current) setRecoveryPlan(result);
+    } catch (error) {
+      if (requestToken === recoveryRequestRef.current) {
+        setRecoveryError(error instanceof Error ? error.message : "Recovery suggestions could not be created.");
+      }
+    } finally {
+      if (requestToken === recoveryRequestRef.current) setRecoveryBusy(false);
     }
   }
 
@@ -264,6 +301,30 @@ export default function Home() {
         </div>
         <p className="footnote">Approve is disabled until a valid analysis exists and a proposed arrival is present. Reject preserves the current session event.</p>
       </section>
+
+      <details className="panel recovery-panel">
+        <summary>
+          <span><span className="eyebrow">Stretch feature</span><strong>Recovery Engine · internal follow-up tasks</strong></span>
+          <span className="tag unknown">Open stretch feature · outside core P0</span>
+        </summary>
+        <p className="helper">This optional agent reads the validated report and suggests internal follow-ups. It does not contact vendors or change event data. Suggestions are not saved and need coordinator review.</p>
+        <button className="secondary-button" type="button" onClick={draftRecoveryPlan} disabled={!canReview || busy || recoveryBusy}>
+          {recoveryBusy ? "Drafting follow-ups…" : "Draft follow-up tasks"}
+        </button>
+        {!canReview && <p className="footnote">Run a successful analysis to enable the Recovery Engine.</p>}
+        {recoveryError && <div className="alert" role="alert">{recoveryError}</div>}
+        {recoveryPlan && (recoveryPlan.proposed_tasks.length === 0
+          ? <p className="empty-state" role="status">No follow-up task was suggested from the current findings.</p>
+          : <>
+            <p className="helper" role="status">Draft suggestions · review before acting · run {recoveryPlan.run_id}</p>
+            <ul className="task-list">{recoveryPlan.proposed_tasks.map((task, index) => <li className="fact" key={`${recoveryPlan.run_id}-${index}`}>
+              <div className="recovery-task-heading"><h3>{task.title}</h3><span className={`tag ${task.priority === "high" ? "warn" : "unknown"}`}>{task.priority} priority</span></div>
+              <p>{task.reason}</p>
+              <p className="helper">Owner: {task.owner_role.replaceAll("_", " ")}{task.task_ids.length ? ` · Related tasks: ${task.task_ids.join(", ")}` : ""}</p>
+              <p className="helper">Based on: {task.source_risk_indices.map(i => `risk ${i + 1}`).join(", ")}</p>
+            </li>)}</ul>
+          </>)}
+      </details>
     </main>
   );
 }

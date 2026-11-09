@@ -12,6 +12,11 @@ coordinator input and report screens are still to be integrated with her work.
 - GET /api/event returns the seeded planning.v1 input.
 - POST /api/analyze accepts that input with a proposed arrival time and returns
   the validated report, calculated setup finish and overlap, and proposed time.
+- After a validated report, the opt-in Recovery Engine at POST /api/recovery makes
+  a separate AI call to propose internal follow-up tasks. It recalculates impact,
+  validates risk indexes, event task IDs, and evidence references, and ties each
+  proposal to both a recovery run ID and its source analysis run ID. Suggestions
+  are not saved, do not modify the event, and cannot contact vendors.
 - src/lib/session.ts implements pending analysis, response receipt, cancellation,
   approval, and rejection for browser session state.
 - src/server/anthropic.ts makes one server-side Anthropic request per analysis.

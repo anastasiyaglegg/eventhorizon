@@ -88,6 +88,12 @@ p { line-height: 1.55; }
 .success { color: var(--green); background: var(--green-soft); border: 1px solid #b8e3c9; border-radius: 10px; padding: 13px 14px; margin-top: 14px; }
 .decision-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 .footnote { color: var(--muted); font-size: 0.84rem; margin: 12px 0 0; }
+.recovery-panel > summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; cursor: pointer; list-style: none; }
+.recovery-panel > summary::-webkit-details-marker { display: none; }
+.recovery-panel > summary:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; border-radius: 8px; }
+.recovery-panel > summary strong { display: block; margin-top: 4px; }
+.recovery-panel[open] > summary { margin-bottom: 14px; }
+.recovery-task-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 
 @media (max-width: 760px) {
   .page-shell { width: min(100% - 22px, 680px); padding-top: 24px; }
