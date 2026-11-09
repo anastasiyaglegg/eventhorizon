@@ -5,6 +5,7 @@ import { analysisInputSchema } from "../lib/contract";
 import { requestAnalysis } from "../client/analysis-api";
 import { requestRecovery } from "../client/recovery-api";
 import type { RecoveryOutput } from "../lib/recovery-contract";
+import { chooseRecoveryTask, clearRecoveryTaskDecisions, recoveryTaskDecisionKey, type RecoveryTaskDecision, type RecoveryTaskDecisions } from "../lib/recovery-review";
 import {
   beginAnalysis,
   clearProposal,
@@ -40,6 +41,7 @@ export default function Home() {
   const [inputError, setInputError] = useState<string | null>(null);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [recoveryPlan, setRecoveryPlan] = useState<RecoveryOutput | null>(null);
+  const [recoveryDecisions, setRecoveryDecisions] = useState<RecoveryTaskDecisions>({});
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const recoveryRequestRef = useRef(0);
   const analysisRequestRef = useRef(0);
@@ -52,6 +54,7 @@ export default function Home() {
     recoveryAbortRef.current = null;
     setRecoveryBusy(false);
     setRecoveryPlan(null);
+    setRecoveryDecisions(clearRecoveryTaskDecisions());
     setRecoveryError(null);
   }
 
@@ -159,7 +162,10 @@ export default function Home() {
         proposed_arrival_time: session.review.proposed_arrival_time,
         analysis: session.review.analysis,
       }, controller.signal);
-      if (requestToken === recoveryRequestRef.current) setRecoveryPlan(result);
+      if (requestToken === recoveryRequestRef.current) {
+        setRecoveryPlan(result);
+        setRecoveryDecisions(clearRecoveryTaskDecisions());
+      }
     } catch (error) {
       if (!controller.signal.aborted && requestToken === recoveryRequestRef.current) {
         setRecoveryError(error instanceof Error ? error.message : "Recovery suggestions could not be created.");
@@ -186,6 +192,10 @@ export default function Home() {
     } catch (error) {
       setInputError(error instanceof Error ? error.message : "Decision is unavailable.");
     }
+  }
+
+  function decideRecoveryTask(key: string, decision: RecoveryTaskDecision) {
+    setRecoveryDecisions((current) => chooseRecoveryTask(current, key, decision));
   }
 
   if (loading) {
@@ -337,6 +347,7 @@ export default function Home() {
           <span className="tag unknown">Optional · stretch feature</span>
         </summary>
         <p className="helper">This optional agent reads the validated report and suggests internal follow-ups. It does not contact vendors or change event data. Suggestions are not saved and need coordinator review.</p>
+        <p className="helper recovery-review-note">For each draft, choose whether to keep or dismiss it for this review. These choices stay in this page only; they do not create tasks or contact vendors.</p>
         <button className="secondary-button" type="button" onClick={draftRecoveryPlan} disabled={!canReview || busy || recoveryBusy}>
           {recoveryBusy ? "Drafting follow-ups…" : "Draft follow-up tasks"}
         </button>
@@ -346,12 +357,21 @@ export default function Home() {
           ? <p className="empty-state" role="status">No follow-up task was suggested from the current findings.</p>
           : <>
             <p className="helper" role="status">Draft suggestions · review before acting · run {recoveryPlan.run_id}</p>
-            <ul className="task-list">{recoveryPlan.proposed_tasks.map((task, index) => <li className="fact" key={`${recoveryPlan.run_id}-${index}`}>
-              <div className="recovery-task-heading"><h3>{task.title}</h3><span className={`tag ${task.priority === "high" ? "warn" : "unknown"}`}>{task.priority} priority</span></div>
-              <p>{task.reason}</p>
-              <p className="helper">Owner: {task.owner_role.replaceAll("_", " ")}{task.task_ids.length ? ` · Related tasks: ${task.task_ids.join(", ")}` : ""}</p>
-              <p className="helper">Based on: {task.source_risk_indices.map(i => `risk ${i + 1}`).join(", ")}</p>
-            </li>)}</ul>
+            <ul className="task-list">{recoveryPlan.proposed_tasks.map((task, index) => {
+              const decisionKey = recoveryTaskDecisionKey(recoveryPlan.run_id, index);
+              const decision = recoveryDecisions[decisionKey];
+              return <li className={`fact recovery-task${decision === "dismissed" ? " recovery-task-dismissed" : ""}`} key={decisionKey}>
+                <div className="recovery-task-heading"><h3>{task.title}</h3><span className={`tag ${task.priority === "high" ? "warn" : "unknown"}`}>{task.priority} priority</span></div>
+                <p>{task.reason}</p>
+                <p className="helper">Owner: {task.owner_role.replaceAll("_", " ")}{task.task_ids.length ? ` · Related tasks: ${task.task_ids.join(", ")}` : ""}</p>
+                <p className="helper">Based on: {task.source_risk_indices.map(i => `risk ${i + 1}`).join(", ")}</p>
+                <div className="recovery-review-actions" aria-label={`Review ${task.title}`}>
+                  <button className="secondary-button recovery-choice keep" type="button" aria-pressed={decision === "kept"} onClick={() => decideRecoveryTask(decisionKey, "kept")}>Keep suggestion</button>
+                  <button className="secondary-button recovery-choice dismiss" type="button" aria-pressed={decision === "dismissed"} onClick={() => decideRecoveryTask(decisionKey, "dismissed")}>Dismiss suggestion</button>
+                  {decision && <span className={`tag ${decision === "kept" ? "good" : "unknown"}`} role="status">{decision === "kept" ? "Kept for this review" : "Dismissed for this review"}</span>}
+                </div>
+              </li>;
+            })}</ul>
           </>)}
       </details>
     </main>
