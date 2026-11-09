@@ -113,7 +113,9 @@ export default function Home() {
     try {
       const next = decide(session, decision);
       setSession(next);
-      setArrivalInput(clockToInput(next.event.vendor.arrival_time));
+      if (arrivalInput !== "") {
+        setArrivalInput(clockToInput(next.event.vendor.arrival_time));
+      }
       setInputError(null);
     } catch (error) {
       setInputError(error instanceof Error ? error.message : "Decision is unavailable.");
@@ -192,6 +194,9 @@ export default function Home() {
               onChange={(eventChange) => updateArrival(eventChange.target.value)}
             />
           </div>
+          <button className="secondary-button" type="button" onClick={() => updateArrival("")} disabled={arrivalInput === ""}>
+            Clear arrival
+          </button>
           <button className="primary-button" type="button" onClick={analyzeProposal} disabled={busy}>
             {busy ? "Analyzing…" : "Analyze impact"}
           </button>
