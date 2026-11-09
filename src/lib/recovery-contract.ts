@@ -8,13 +8,6 @@ const evidenceSchema = z.object({
   field: z.string().min(1).max(80),
 }).strict();
 
-const calculationSchema = z.object({
-  setup_finish: z.string().nullable(),
-  overlap_minutes: z.number().int().nonnegative().nullable(),
-  affected_task_ids: z.array(id).max(50),
-  unknowns: z.array(z.string().min(1).max(500)).max(30),
-}).strict();
-
 const proposedTaskSchema = z.object({
   title: z.string().min(1).max(160),
   reason: z.string().min(1).max(500),
@@ -25,9 +18,12 @@ const proposedTaskSchema = z.object({
   evidence: z.array(evidenceSchema).min(1).max(20),
 }).strict();
 
+export const proposedRecoveryTasksSchema = z.object({
+  proposed_tasks: z.array(proposedTaskSchema).max(8),
+}).strict();
+
 export const recoveryInputSchema = z.object({
   contract_version: z.literal("recovery.v1"),
-  run_id: z.string().uuid(),
   source_run_id: z.string().uuid(),
   event: analysisInputSchema.shape.snapshot.shape.event,
   proposed_arrival_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d:00$/).nullable(),

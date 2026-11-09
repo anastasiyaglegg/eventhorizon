@@ -42,6 +42,25 @@ export default function Home() {
   const [recoveryPlan, setRecoveryPlan] = useState<RecoveryOutput | null>(null);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const recoveryRequestRef = useRef(0);
+  const analysisRequestRef = useRef(0);
+  const recoveryAbortRef = useRef<AbortController | null>(null);
+  const analysisAbortRef = useRef<AbortController | null>(null);
+
+  function cancelRecovery() {
+    recoveryRequestRef.current++;
+    recoveryAbortRef.current?.abort();
+    recoveryAbortRef.current = null;
+    setRecoveryBusy(false);
+    setRecoveryPlan(null);
+    setRecoveryError(null);
+  }
+
+  function cancelAnalysis() {
+    analysisRequestRef.current++;
+    analysisAbortRef.current?.abort();
+    analysisAbortRef.current = null;
+    setBusy(false);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -77,11 +96,10 @@ export default function Home() {
   const canApprove = canReview && pendingArrival != null;
 
   function updateArrival(value: string) {
-    recoveryRequestRef.current++;
+    cancelRecovery();
+    cancelAnalysis();
     setArrivalInput(value);
     setInputError(null);
-    setRecoveryPlan(null);
-    setRecoveryError(null);
     setSession((current) => current ? clearProposal(current) : current);
   }
 
@@ -95,59 +113,70 @@ export default function Home() {
       return;
     }
 
+    cancelRecovery();
+    cancelAnalysis();
+    const analysisToken = analysisRequestRef.current;
+    const controller = new AbortController();
+    analysisAbortRef.current = controller;
     const requestId = crypto.randomUUID();
-    recoveryRequestRef.current++;
     const pending = beginAnalysis(clearProposal(session), proposedArrival, requestId);
     setSession(pending);
-    setRecoveryPlan(null);
-    setRecoveryError(null);
     setBusy(true);
     setInputError(null);
 
     try {
       const input = buildAnalysisInput(pending.event, proposedArrival);
-      const packet = await requestAnalysis(input);
+      const packet = await requestAnalysis(input, controller.signal);
       setSession((current) =>
         current ? receiveAnalysis(current, requestId, packet) : current,
       );
     } catch (error) {
+      if (controller.signal.aborted) return;
       const message = error instanceof Error ? error.message : "Analysis could not finish. Please retry.";
       setSession((current) =>
         current ? failAnalysis(current, requestId, message) : current,
       );
     } finally {
-      setBusy(false);
+      if (analysisToken === analysisRequestRef.current) {
+        analysisAbortRef.current = null;
+        setBusy(false);
+      }
     }
   }
 
   async function draftRecoveryPlan() {
     if (!session?.review || session.status !== "review-ready" || !session.pending?.requestId) return;
-    const requestToken = ++recoveryRequestRef.current;
+    cancelRecovery();
+    const requestToken = recoveryRequestRef.current;
+    const controller = new AbortController();
+    recoveryAbortRef.current = controller;
     setRecoveryBusy(true);
-    setRecoveryError(null);
-    setRecoveryPlan(null);
     try {
       const result = await requestRecovery({
         contract_version: "recovery.v1",
-        run_id: crypto.randomUUID(),
         source_run_id: session.pending.requestId,
         event: session.event,
         proposed_arrival_time: session.review.proposed_arrival_time,
         analysis: session.review.analysis,
-      });
+      }, controller.signal);
       if (requestToken === recoveryRequestRef.current) setRecoveryPlan(result);
     } catch (error) {
-      if (requestToken === recoveryRequestRef.current) {
+      if (!controller.signal.aborted && requestToken === recoveryRequestRef.current) {
         setRecoveryError(error instanceof Error ? error.message : "Recovery suggestions could not be created.");
       }
     } finally {
-      if (requestToken === recoveryRequestRef.current) setRecoveryBusy(false);
+      if (requestToken === recoveryRequestRef.current) {
+        recoveryAbortRef.current = null;
+        setRecoveryBusy(false);
+      }
     }
   }
 
   function makeDecision(decision: "approve" | "reject") {
     if (!session) return;
     try {
+      cancelRecovery();
+      cancelAnalysis();
       const next = decide(session, decision);
       setSession(next);
       if (arrivalInput !== "") {
@@ -305,7 +334,7 @@ export default function Home() {
       <details className="panel recovery-panel">
         <summary>
           <span><span className="eyebrow">Stretch feature</span><strong>Recovery Engine · internal follow-up tasks</strong></span>
-          <span className="tag unknown">Open stretch feature · outside core P0</span>
+          <span className="tag unknown">Optional · stretch feature</span>
         </summary>
         <p className="helper">This optional agent reads the validated report and suggests internal follow-ups. It does not contact vendors or change event data. Suggestions are not saved and need coordinator review.</p>
         <button className="secondary-button" type="button" onClick={draftRecoveryPlan} disabled={!canReview || busy || recoveryBusy}>

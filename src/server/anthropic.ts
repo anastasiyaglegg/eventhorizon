@@ -17,19 +17,19 @@ const system = [
   "Return a recommendation for human review. You cannot approve or change event data.",
 ].join("\n");
 
-export const callAnthropic: AnalysisProvider = async (input, calculation) => {
+export const callAnthropic: AnalysisProvider = async (input, calculation, signal?: AbortSignal) => {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new AnalysisError("provider_not_configured", "The server needs an Anthropic API key before analysis can run.");
-  const client = new Anthropic({ apiKey, maxRetries: 0, timeout: 30000 });
+  const client = new Anthropic({ apiKey, maxRetries: 0, timeout: 90000 });
   try {
     const message = await client.messages.create({
       model: process.env.ANTHROPIC_MODEL || "claude-opus-4-6",
-      max_tokens: 3000,
+      max_tokens: 16000,
       thinking: { type: "adaptive" },
       output_config: { effort: "medium", format: zodOutputFormat(analysisOutputSchema) },
       system,
       messages: [{ role: "user", content: JSON.stringify({ input, calculation }) }],
-    });
+    }, { signal });
     if (message.stop_reason !== "end_turn") {
       throw new AnalysisError("invalid_output", "The AI response was incomplete. Please retry.");
     }
@@ -37,6 +37,7 @@ export const callAnthropic: AnalysisProvider = async (input, calculation) => {
     try { return JSON.parse(text); }
     catch { throw new AnalysisError("invalid_output", "The AI response was not valid JSON. Please retry."); }
   } catch (error) {
+    if (signal?.aborted) throw error;
     if (error instanceof AnalysisError) throw error;
     if (error instanceof Anthropic.APIConnectionTimeoutError) {
       throw new AnalysisError("provider_timeout", "AI analysis timed out. Please retry.");

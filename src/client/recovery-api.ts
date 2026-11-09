@@ -1,10 +1,11 @@
 import { recoveryOutputSchema, type RecoveryInput, type RecoveryOutput } from "../lib/recovery-contract";
 
-export async function requestRecovery(input: RecoveryInput, fetcher: typeof fetch = fetch): Promise<RecoveryOutput> {
+export async function requestRecovery(input: RecoveryInput, signal?: AbortSignal, fetcher: typeof fetch = fetch): Promise<RecoveryOutput> {
   const response = await fetcher("/api/recovery", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+    signal,
     cache: "no-store",
   });
   const payload: unknown = await response.json().catch(() => null);
