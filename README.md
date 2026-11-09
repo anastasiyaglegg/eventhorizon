@@ -31,6 +31,17 @@ Use Node.js 22 or newer.
 The selected model is configurable through ANTHROPIC_MODEL. Keep medium effort
 compatible with the configured model. The API key stays on the server.
 
+## Vendor directory
+
+The vendor finder at `/vendors` uses the fictional JSON directory unless both
+`SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` are set in `.env.local`. When configured,
+`GET /api/vendors` reads the public `vendors` table using the publishable key and relies
+on its row-level security policy. Do not put a Supabase service-role key in the
+app. The expected columns are `id`, `name`, `category`, `borough`, `description`,
+`contact_email`, `price_min`, `price_max`, `capacity_min`, `capacity_max`, `rating`, `review_count`,
+`review_summary`, `source_url`, and `is_synthetic`. Prices, capacity, ratings,
+reviews, and availability should remain unknown unless verified.
+
 Run npm run typecheck, npm test, and npm run build for local verification.
 Provider tests simulate responses. On November 5, 2026, one live Claude Opus 4.6
 medium analysis passed through POST /api/analyze with the team's API key. It returned

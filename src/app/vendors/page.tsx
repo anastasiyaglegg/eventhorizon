@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { samplePrice, searchVendors, type VendorCriteria, type Vendor } from "../../lib/vendor-search";
+import { capacityLabel, samplePrice, sampleVendors, searchVendors, type VendorCriteria, type Vendor } from "../../lib/vendor-search";
 
 const example = "Find a caterer in Brooklyn for 80 guests under $3,000";
 const categoryIcons: Record<string, string> = {
@@ -15,11 +15,29 @@ export default function VendorFinder() {
   const [query, setQuery] = useState("");
   const [criteria, setCriteria] = useState<VendorCriteria>({});
   const [turns, setTurns] = useState<Turn[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>(sampleVendors);
+  const [directorySource, setDirectorySource] = useState<"sample" | "supabase">("sample");
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/vendors")
+      .then(async response => {
+        if (!response.ok) throw new Error("Vendor lookup is unavailable");
+        return response.json() as Promise<{ source: "sample" | "supabase"; vendors: Vendor[] }>;
+      })
+      .then(result => {
+        if (!active || result.source !== "supabase" || !Array.isArray(result.vendors) || result.vendors.length === 0) return;
+        setVendors(result.vendors);
+        setDirectorySource("supabase");
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   function search(text: string) {
     const prompt = text.trim();
     if (!prompt) return;
-    const result = searchVendors(prompt, criteria);
+    const result = searchVendors(prompt, criteria, vendors);
     setCriteria(result.criteria);
     setTurns(current => [...current, { query: prompt, message: result.message, matches: result.matches }]);
     setQuery("");
@@ -37,13 +55,15 @@ export default function VendorFinder() {
         <div>
           <p className="eyebrow">Event Horizon</p>
           <h1>Vendor finder</h1>
-          <p className="subtitle">Find sample caterers, bakeries, venues, AV providers, and photographers.</p>
+          <p className="subtitle">Find caterers, bakeries, venues, AV providers, and photographers.</p>
         </div>
-        <span className="status-pill">Synthetic directory</span>
+        <span className="status-pill">{directorySource === "supabase" ? "Supabase directory" : "Sample directory"}</span>
       </header>
       <section className="panel" aria-labelledby="search-heading">
         <h2 id="search-heading">What do you need for your event?</h2>
-        <p className="helper">Vendors, contacts, prices, ratings, and reviews are fictional. Availability is unknown.</p>
+        <p className="helper">{directorySource === "supabase"
+          ? "Vendor details come from the connected directory. Confirm prices, ratings, and availability with each vendor."
+          : "Sample vendors, contacts, prices, ratings, and reviews are fictional. Availability is unknown."}</p>
         <button className="secondary-button vendor-example" type="button" onClick={() => search(example)}>
           {example}
         </button>
@@ -59,15 +79,15 @@ export default function VendorFinder() {
                       <p className="eyebrow"><span aria-hidden="true">{categoryIcons[vendor.service]}</span> {vendor.service} · {vendor.borough}</p>
                       <h3>{vendor.name}</h3>
                     </div>
-                    <span className="tag good"><span aria-hidden="true">★&nbsp;</span> {vendor.rating.toFixed(1)} / 5 sample rating</span>
+                    {vendor.rating !== null && <span className="tag good"><span aria-hidden="true">★&nbsp;</span> {vendor.rating.toFixed(1)} / 5 {vendor.isSynthetic ? "sample rating" : `rating${vendor.reviewCount === null ? "" : ` · ${vendor.reviewCount} reviews`}`}</span>}
                   </div>
                   <p>{vendor.details}</p>
-                  <p className="helper">Sample price {samplePrice(vendor)} · Capacity {vendor.capacity ?? "Unknown"} · Availability unknown</p>
-                  <p className="helper">Sample contact <span className="vendor-contact">{vendor.contactEmail}</span></p>
-                  <blockquote className="vendor-review">
-                    <span className="fact-label">Sample review</span>
+                  <p className="helper">{vendor.isSynthetic ? "Sample price" : "Listed price"} {samplePrice(vendor)} · Capacity {capacityLabel(vendor)} · Availability unknown</p>
+                  {(vendor.contactEmail || vendor.sourceUrl) && <p className="helper">{vendor.isSynthetic ? "Sample contact" : "Contact"} {vendor.contactEmail && <span className="vendor-contact">{vendor.contactEmail}</span>}{vendor.sourceUrl && <> · <a href={vendor.sourceUrl} target="_blank" rel="noreferrer">Source</a></>}</p>}
+                  {vendor.review && <blockquote className="vendor-review">
+                    <span className="fact-label">{vendor.isSynthetic ? "Sample review" : "Review summary"}</span>
                     <p>“{vendor.review}”</p>
-                  </blockquote>
+                  </blockquote>}
                 </li>)}
               </ul>}
             </div>
