@@ -4,14 +4,14 @@ import {
 } from "../lib/contract";
 import { calculateImpact } from "../lib/time";
 
-export type AnalysisProvider = (input: AnalysisInput, calculation: Calculation) => Promise<unknown>;
+export type AnalysisProvider = (input: AnalysisInput, calculation: Calculation, signal?: AbortSignal) => Promise<unknown>;
 
-export async function analyze(input: unknown, provider: AnalysisProvider): Promise<ReviewPacket> {
+export async function analyze(input: unknown, provider: AnalysisProvider, signal?: AbortSignal): Promise<ReviewPacket> {
   const parsed = analysisInputSchema.safeParse(input);
   if (!parsed.success) throw new AnalysisError("invalid_input", "The event or arrival change has an invalid format.");
   const request = parsed.data;
   const calculation = calculateImpact(request);
-  const result = analysisOutputSchema.safeParse(await provider(structuredClone(request), structuredClone(calculation)));
+  const result = analysisOutputSchema.safeParse(await provider(structuredClone(request), structuredClone(calculation), signal));
   if (!result.success) throw new AnalysisError("invalid_output", "The AI returned an invalid impact report. Please retry.");
   const output = result.data;
   const { event, proposed_change } = request.snapshot;

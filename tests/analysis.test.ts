@@ -141,6 +141,7 @@ test("Anthropic adapter makes one Opus medium request and never retries a provid
     calls++;
     const body = request instanceof Request ? await request.json() : JSON.parse(String(init?.body));
     assert.equal(body.model, "claude-opus-4-6");
+    assert.equal(body.max_tokens, 16000);
     assert.equal(body.output_config.effort, "medium");
     assert.equal(body.output_config.format.type, "json_schema");
     assert.ok(body.output_config.format.schema.properties.scheduling_risks);
