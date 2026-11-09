@@ -226,7 +226,7 @@ export default function Home() {
             combined AI analysis call; exact timing stays calculated in application code.
           </p>
         </div>
-        <span className="status-pill">planning.v1 · one call</span>
+        <span className="status-pill">Core P0 · Planning/readiness</span>
       </header>
 
       <section className="panel">

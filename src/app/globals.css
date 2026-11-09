@@ -109,3 +109,17 @@ p { line-height: 1.55; }
   .task-item { display: block; }
   .task-detail { display: block; margin-top: 4px; }
 }
+
+.vendor-finder { max-width: 860px; }
+.vendor-finder-heading { margin-top: 22px; }
+.scope-note { color: var(--muted); font-size: 0.9rem; margin: 12px 0 0; }
+.vendor-example { margin-top: 16px; text-align: left; }
+.vendor-turn { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; overflow-wrap: anywhere; }
+.vendor-results { padding: 0; list-style: none; display: grid; gap: 10px; }
+.vendor-results p { margin-bottom: 4px; }
+.vendor-form { margin-top: 20px; }
+.vendor-form input { width: 100%; }
+.vendor-card-heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.vendor-contact { font-weight: 650; color: var(--ink); }
+.vendor-review { border-left: 3px solid var(--line); margin: 12px 0 0; padding: 4px 0 4px 12px; }
+.vendor-review p { font-size: 0.9rem; margin: 0; }
