@@ -137,3 +137,7 @@ p { line-height: 1.55; }
 
 .vendor-categories { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 18px; }
 .booking-conflict { color: #94151e; background: #ffe4e5; border: 2px solid #be2630; border-radius: 8px; padding: 10px; font-weight: 700; }
+
+.planned-list { display: grid; gap: 12px; list-style: none; padding: 0; }
+.planned-item { border: 1px solid #a5c7bf; border-radius: 10px; padding: 14px; background: #f3faf7; }
+.planned-item p { margin: 6px 0; }
