@@ -9,7 +9,7 @@ const recoverySchema = z.object({ suggestions: z.array(z.object({ issue_id: z.st
 type Planning = z.infer<typeof planningSchema>;
 type Recovery = z.infer<typeof recoverySchema>;
 type Agent = (input: { issues: ScheduleIssue[]; planning?: Planning }, signal?: AbortSignal) => Promise<unknown>;
-const permitted = { missing_slot: ["provide_schedule"], catering_arrival: ["adjust_arrival", "confirm_schedule"], catering_finish: ["adjust_finish", "confirm_schedule"], too_early: ["adjust_arrival", "confirm_schedule"], decor_too_early: ["adjust_arrival", "confirm_schedule"], late_arrival: ["adjust_arrival", "confirm_schedule"] } as const;
+const permitted = { missing_slot: ["provide_schedule"], catering_arrival: ["adjust_arrival", "confirm_schedule"], catering_finish: ["adjust_finish", "confirm_schedule"], needs_early_setup: ["adjust_arrival", "confirm_schedule"], decor_too_early: ["adjust_arrival", "confirm_schedule"], late_arrival: ["adjust_arrival", "confirm_schedule"] } as const;
 const actionLabels = { provide_schedule: "Enter the vendor's date and time.", adjust_arrival: "Review and adjust the vendor's arrival time.", adjust_finish: "Review and adjust the vendor's finish time.", confirm_schedule: "Confirm the timing with the vendor before making a change." };
 
 function completeIds(items: { issue_id: string }[], issues: ScheduleIssue[]) {

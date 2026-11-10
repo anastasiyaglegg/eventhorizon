@@ -14,15 +14,18 @@ test("catering and bakery 1–3 hour boundaries before and after are inclusive",
     assert.deepEqual(check(vendor(kind, "17:01", "20:59")).map(i => i.code), ["catering_arrival", "catering_finish"]);
   }
 });
-test("other vendors can arrive at most an hour early", () => {
+test("other vendors start at least an hour early and may overlap", () => {
   assert.deepEqual(check(vendor("av", "17:00", "20:00")), []);
-  assert.equal(check(vendor("photography", "16:59", "20:00"))[0].code, "too_early");
+  assert.deepEqual(check(vendor("photography", "16:59", "20:00")), []);
+  assert.equal(check(vendor("photography", "17:01", "20:00"))[0].code, "needs_early_setup");
+  assert.deepEqual(check(vendor("av", "17:00", "20:00"), vendor("photography", "17:00", "20:00")), []);
 });
-test("florists and decorators may arrive up to three days before", () => {
+test("florists and decorators may set up together up to two days before", () => {
   for (const kind of ["florist", "decorator"]) {
-    assert.deepEqual(check(vendor(kind, "18:00", "19:00", "2026-11-17")), []);
-    assert.equal(check(vendor(kind, "17:59", "19:00", "2026-11-17"))[0].code, "decor_too_early");
+    assert.deepEqual(check(vendor(kind, "18:00", "19:00", "2026-11-18")), []);
+    assert.equal(check(vendor(kind, "17:59", "19:00", "2026-11-18"))[0].code, "decor_too_early");
   }
+  assert.deepEqual(check(vendor("florist", "18:00", "19:00", "2026-11-18"), vendor("decorator", "18:00", "19:00", "2026-11-18")), []);
 });
 test("missing slots and invalid dates are not treated as confirmed", () => {
   assert.equal(evaluateSchedule({ version: "schedule-review.v1", event, vendors: [{ id: "x", name: "Florist", category: "florist", slot: null }] }).issues[0].code, "missing_slot");
@@ -35,7 +38,10 @@ test("Planning hands checked issues to Recovery and binds the snapshot", async (
   assert.equal(result.issues[0].code, "catering_arrival"); assert.match(result.snapshot_hash, /^[a-f0-9]{64}$/); assert.equal(result.suggestions[0].text, "Review and adjust the vendor's arrival time.");
 });
 test("vendors who start after the event begins are flagged", () => {
-  for (const kind of ["av", "photography", "entertainment", "florist", "decorator"]) {
+  for (const kind of ["av", "photography", "entertainment"]) {
+    assert.deepEqual(check(vendor(kind, "18:30", "20:00")).map(i => i.code), ["needs_early_setup"]);
+  }
+  for (const kind of ["florist", "decorator"]) {
     assert.deepEqual(check(vendor(kind, "18:30", "20:00")).map(i => i.code), ["late_arrival"]);
     assert.deepEqual(check(vendor(kind, "18:00", "20:00")), []);
   }
