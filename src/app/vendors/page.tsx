@@ -137,12 +137,12 @@ export default function VendorFinder() {
     const result = searchVendors(prompt, criteria, vendors);
     setCriteria(result.criteria);
     setTurns(current => [...current, { query: prompt, message: result.message, matches: result.matches, possibleMatches: result.possibleMatches }]);
-    setQuery("");
+    setQuery(""); setNameQuery("");
   }
 
   function browseCategory(service: Service) {
     const result = searchVendors(service, {}, vendors);
-    setCriteria(result.criteria); setTurns([{ query: serviceLabels[service], message: result.message, matches: result.matches, possibleMatches: result.possibleMatches }]); setQuery("");
+    setCriteria(result.criteria); setTurns([{ query: serviceLabels[service], message: result.message, matches: result.matches, possibleMatches: result.possibleMatches }]); setQuery(""); setNameQuery("");
   }
 
   function searchByName(event: FormEvent<HTMLFormElement>) {
@@ -154,6 +154,7 @@ export default function VendorFinder() {
     const message = found.length === 0 ? `No vendors found with “${name}” in their name.` : visible.length === 0 ? "This vendor is already in your event plan." : `Found ${visible.length} ${visible.length === 1 ? "vendor" : "vendors"} matching “${name}”.`;
     setCriteria({});
     setTurns([{ query: name, message, matches: visible, possibleMatches: [] }]);
+    setNameQuery(""); setQuery("");
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -248,7 +249,7 @@ export default function VendorFinder() {
           <div className="decision-row">
             <button className="primary-button" disabled={!query.trim()}>Find vendors</button>
             <button className="secondary-button" type="button" disabled={!turns.length}
-              onClick={() => { setTurns([]); setCriteria({}); setQuery(""); }}>New search</button>
+              onClick={() => { setTurns([]); setCriteria({}); setQuery(""); setNameQuery(""); }}>New search</button>
           </div>
         </form>
       </section>
