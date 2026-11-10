@@ -273,7 +273,6 @@ export default function Home() {
               id="proposed-arrival"
               type="text"
               autoComplete="off"
-              inputMode="numeric"
               placeholder="17:00"
               maxLength={5}
               aria-describedby="arrival-help"
