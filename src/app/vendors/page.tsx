@@ -6,7 +6,7 @@ import { capacityLabel, samplePrice, sampleVendors, searchVendors, type VendorCr
 
 const example = "Find a caterer in Brooklyn for 80 guests under $3,000";
 const categoryIcons: Record<string, string> = {
-  catering: "🍴", bakery: "🥖", venue: "🏛️", AV: "🎛️", photography: "📷",
+  catering: "🍴", bakery: "🥖", venue: "🏛️", av: "🎛️", photography: "📷", florist: "🌸", decorator: "🎈", entertainment: "🎵",
 };
 
 type Turn = { query: string; message: string; matches: Vendor[]; possibleMatches: Vendor[] };
@@ -62,7 +62,7 @@ export default function VendorFinder() {
         <div>
           <p className="eyebrow">Event Horizon</p>
           <h1>Vendor finder</h1>
-          <p className="subtitle">Find caterers, bakeries, venues, AV providers, and photographers.</p>
+          <p className="subtitle">Find caterers, bakeries, florists, venues, AV providers, photographers, decorators, and entertainment.</p>
           <p className="scope-note"><strong>Stretch feature</strong> · Separate from the core P0 demo. Recovery Engine is the first stretch priority.</p>
         </div>
         <span className="status-pill">{directorySource === "supabase" ? "Supabase directory" : "Sample directory"}</span>
