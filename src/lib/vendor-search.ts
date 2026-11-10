@@ -3,6 +3,9 @@ import directory from "../data/vendors.json";
 const services = [
   { name: "bakery", pattern: /\b(?:bread|bakery|bakeries|baker|dinner rolls?|sourdough|focaccia)\b/i },
   { name: "catering", pattern: /\b(?:caterer(?:s)?|catering|food)\b/i },
+  { name: "florist", pattern: /\b(?:florists?|florals?|flowers?)\b/i },
+  { name: "decorator", pattern: /\b(?:decorators?|decorations?|decor|event design)\b/i },
+  { name: "entertainment", pattern: /\b(?:entertainment|entertainers?|djs?|bands?)\b/i },
   { name: "venue", pattern: /\b(?:venue(?:s)?|event space)\b/i },
   { name: "AV", pattern: /\b(?:av|audio[ -]?visual|sound|lighting)\b/i },
   { name: "photography", pattern: /\b(?:photo(?:graphy|grapher)?s?)\b/i },
@@ -42,6 +45,9 @@ export function normalizeVendorService(service: string) {
   if (["caterer", "caterers", "food"].includes(normalized)) return "catering";
   if (["baker", "bakers", "bakeries"].includes(normalized)) return "bakery";
   if (["audio visual", "audio-visual", "sound", "lighting"].includes(normalized)) return "av";
+  if (["florists", "floral", "florals", "flowers"].includes(normalized)) return "florist";
+  if (["decorators", "decoration", "decorations", "decor", "event design"].includes(normalized)) return "decorator";
+  if (["entertainer", "entertainers", "dj", "djs", "band", "bands"].includes(normalized)) return "entertainment";
   if (["photo", "photographer", "photographers", "photo services"].includes(normalized)) return "photography";
   return normalized;
 }
@@ -72,9 +78,20 @@ export function describeCriteria(criteria: VendorCriteria) {
   ].filter(Boolean).join(" · ");
 }
 
+/** Search only names in the supplied directory, independent of prior filters. */
+export function searchVendorNames(query: string, vendors: Vendor[] = sampleVendors): Vendor[] {
+  const name = query.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+  if (name.length < 2) return [];
+  return vendors.filter(vendor => vendor.name.replace(/\s+/g, " ").toLocaleLowerCase("en-US").includes(name));
+}
+
 export function searchVendors(query: string, previous: VendorCriteria, vendors: Vendor[] = sampleVendors) {
   const next = { ...previous };
-  const service = services.find(({ pattern }) => pattern.test(query));
+  // When a request mentions several services ("venue with flowers"), use the one named first.
+  const service = services
+    .map(item => ({ item, at: query.search(item.pattern) }))
+    .filter(({ at }) => at >= 0)
+    .sort((a, b) => a.at - b.at)[0]?.item;
   const places = boroughs.filter(borough => new RegExp(`\\b${borough.replace(" ", "\\s+")}\\b`, "i").test(query));
   const guestCount = query.match(/\b([\d,]+)\s*(?:guests?|people|attendees?)\b/i);
   const budget = query.match(/(?:\$\s*|\bbudget(?:\s+(?:of|is))?\s+)([\d,]+(?:\.\d+)?)\s*(k\b)?/i);
@@ -89,7 +106,7 @@ export function searchVendors(query: string, previous: VendorCriteria, vendors: 
   if (guestCount) next.guests = Number(guestCount[1].replaceAll(",", ""));
   if (budget) next.budget = Number(budget[1].replaceAll(",", "")) * (budget[2] ? 1000 : 1);
   if (!next.service) {
-    return { criteria: next, message: "What service do you need: catering, a bakery, a venue, AV, or photography?", matches: [], possibleMatches: [] };
+    return { criteria: next, message: "What service do you need: catering, a bakery, a florist, a venue, AV, photography, decor, or entertainment?", matches: [], possibleMatches: [] };
   }
 
   const classified = vendors.flatMap((vendor) => {

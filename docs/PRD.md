@@ -2,7 +2,7 @@
 
 Source: https://docs.google.com/document/d/1eqek1tXTcvPv9cgyvkWScJjRMRW4HO3Phi-A7GKCodc
 
-Status snapshot updated November 10, 2026. The Google Doc is the working PRD; PR #10 and PR #11 are open for review.
+Status snapshot updated November 10, 2026. The Google Doc is the working PRD. PR #10 has merged into develop. PRs #11 and #13 are open for review.
 
 Event Horizon — AI EVENT READINESS & TASK AUTOMATION
 
@@ -78,9 +78,9 @@ The Steroid — a 5 PM arrival plus 90-minute setup visibly produces a 6:30 PM f
 
 #### Non-Goals
 
-- Outside the current core: a separate Readiness Agent, Vendor Follow-up Agent and message sending, cost analysis, persistent audit history, multiple saved events, external calendar synchronization, and custom event creation. The optional Recovery Agent is implemented; the separate vendor workflow is in review.
+- Outside the current core: a separate Readiness Agent, Vendor Follow-up Agent and message sending, cost analysis, persistent audit history, multiple saved events, and external calendar synchronization. The optional Recovery Agent and vendor workflow are implemented on develop. Local event creation is proposed in PR #13.
 
-- The seeded core has been reviewed on develop. The vendor extension is under review; its final assessed scope needs team and instructor agreement. Messaging and calendar synchronization require separate scope decisions.
+- The seeded core and vendor extension are on develop. The expanded calendar and theme experience is in PR #13; its assessed scope still needs team and instructor agreement. Messaging and calendar synchronization remain outside the current build.
 
 ### 2d. Success Metrics
 
@@ -111,7 +111,7 @@ One event and one proposed arrival change
 
 Stretch capabilities — outside the day-3 commitment
 
-- Expanded vendor schedule analysis is implemented in PR #10 and awaits review and merge.
+- Expanded vendor schedule analysis merged into develop with PR #10. PR #13 proposes a visual calendar, a conflict view, and revised setup windows.
 
 - Recovery follow-up drafts are implemented on develop; a separate Readiness Agent remains deferred.
 
@@ -153,22 +153,22 @@ Sub-journey: Correct a fact and rerun
 
 ### 3a. Current build and expanded vendor workflow — November 10, 2026
 
-**Status.** The seeded arrival review and optional Recovery follow-up drafts are on `develop`. The expanded Vendor Finder, schedule rules, and two-agent review are in [PR #10](https://github.com/anastasiyaglegg/eventhorizon/pull/10); clearer core-screen steps are in [PR #11](https://github.com/anastasiyaglegg/eventhorizon/pull/11). Both PRs are open and requested for Crystal’s review; neither is merged. Lanice’s approval remains a separate review step.
+**Status.** The seeded arrival review, optional Recovery follow-up drafts, Vendor Finder, schedule rules, and two-agent review are on `develop` after [PR #10](https://github.com/anastasiyaglegg/eventhorizon/pull/10) merged. [PR #11](https://github.com/anastasiyaglegg/eventhorizon/pull/11) was synchronized with updated `develop` and is mergeable, awaiting Crystal’s review. [PR #13](https://github.com/anastasiyaglegg/eventhorizon/pull/13) adds a theme-led home page and a shared local calendar/conflict workflow; it is also open for Crystal’s review. Nothing in #11 or #13 has merged. Lanice’s approval remains separate.
 
 **Vendor Finder.** A separate page searches a Supabase directory of real businesses by category, name, and borough. Official source links are provided when recorded. Demo prices, capacity, and availability are explicitly fictional and must not be used as verified facts. Contact information and reviews may be missing. The vendor chatbot is on hold until Anastasiya requests it.
 
 **Event plan.** A coordinator selects one venue and vendors, enters the event date, start and end, guest count, and each selected vendor’s date and 24-hour time. The venue and selected vendors appear at the top; vendor scheduling shows other scheduled vendors for this event. Overlapping vendor slots and manually entered events are flagged for human review. Confirm access for a vendor on a different venue date. Selections are session-only; they are not confirmed reservations, and no messages are sent.
 
-**Scheduling rules.** Caterers and bakeries start 1–3 hours before the event starts and finish 1–3 hours after it ends. Florists and decorators can start up to 72 hours before event start; other vendor categories can start no more than one hour early. The current rules do not impose a universal latest arrival on other categories. Slots and events must each start and end on the same date; overnight support is not implemented. Human confirmation is required for venue access, real prices, and availability.
+**Scheduling rules.** On current `develop`, caterers and bakeries start 1–3 hours before the event starts and finish 1–3 hours after it ends. Florists and decorators can start up to 72 hours before; other vendors can start no more than one hour early. PR #13 proposes the team’s newer rule: florist and decorator setup can occur concurrently up to two days before the event, and other vendors can work concurrently but must start at least one hour before it. These PR #13 changes are not yet merged. Slots and events must each start and end on the same date; overnight support is not implemented. Human confirmation is required for venue access, real prices, and availability.
 
 **Agent handoff.** Code validates the schedule and calculates rule violations. Planning prioritizes those findings; when there are findings, Recovery proposes limited, issue-linked next steps. Outputs and issue references are validated. Edits invalidate pending results. The agents do not approve changes, reserve vendors, or send messages. A live local check found a caterer arriving 30 minutes early and produced a recovery suggestion; broader scenarios and deployed testing remain.
 
 **Next important work.**
 
-1. Crystal reviews PRs #10 and #11; fix findings and merge only with Anastasiya’s instruction.
+1. Crystal reviews open PRs #11 and #13; fix findings and merge only with Anastasiya’s instruction.
 2. Run the core and vendor flows together from updated `develop`, including normal, boundary, missing-data, and failure cases; verify the connected database and Anthropic configuration without exposing keys.
 3. Decide with the team whether the expanded scope is part of the assessed MVP and submit the revised PRD to Lanice.
-4. If continued after the demo, add durable event-specific plans and permission controls, then test overnight slots and real calendar conflicts. Current plans and manually entered events are not persisted or synced to an external calendar.
+4. Review PR #13’s theme picker, calendar, local event add/cancel, and conflict screen. These plans are saved only in the browser session; they are not external bookings or synchronized calendar events. Notification email was removed from scope at Anastasiya’s request.
 5. Open a separate `develop`-to-`main` PR when the team is ready for release.
 
 ## 4. APPENDIX
@@ -185,6 +185,6 @@ Local state — one event and one pending proposed arrival in the browser sessio
 
 Basic checks — require a valid arrival time and a structured response with only known task references. A failed request or invalid response shows a recoverable error and blocks approval. The user may request analysis again. Keep the API key on the server. Use synthetic event data and treat vendor notes as untrusted input.
 
-Future backlog — vendor message drafting and copying, persistent event plans and audit records, permission controls, real calendar integration, overnight schedules, known-cost calculations, print/export, and expanded evaluations. The vendor chatbot is on hold. Review priorities with Crystal and Lanice.
+Future backlog — vendor message drafting and copying, persistent event plans and audit records, permission controls, real calendar integration, overnight schedules, known-cost calculations, print/export, and expanded evaluations. The vendor chatbot is on hold. Automatic booking email was removed from scope. Review priorities with Crystal and Lanice.
 
 Demo checks — (1) 4 PM arrival plus 90-minute setup for a 6 PM event finishes at 5:30 PM and shows no event-start overlap. (2) 5 PM arrival finishes at 6:30 PM and shows a 30-minute overlap. The report identifies only tasks with supplied vendor dependencies. (3) Missing arrival or setup information stays unknown and prompts verification. For each valid case, approve changes the local arrival and reject preserves it. An invalid response or provider failure blocks approval and shows an error.
