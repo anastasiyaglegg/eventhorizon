@@ -56,3 +56,12 @@ test("vendors with missing price or capacity remain visible as possible matches"
   assert.equal(result.matches.length, 0);
   assert.equal(result.possibleMatches[0].id, incomplete.id);
 });
+
+test("recognizes added vendor categories and normalizes directory values", () => {
+  for (const [query, service] of [["flowers in Brooklyn", "florist"], ["event decorators in Brooklyn", "decorator"], ["DJ in Brooklyn", "entertainment"]] as const) {
+    const vendor = { ...sampleVendors[0], service: service === "florist" ? "Florists" : service === "decorator" ? "Decor" : "DJ", borough: "Brooklyn" };
+    const result = searchVendors(query, {}, [vendor]);
+    assert.equal(result.criteria.service, service);
+    assert.equal(result.matches.length + result.possibleMatches.length, 1);
+  }
+});
