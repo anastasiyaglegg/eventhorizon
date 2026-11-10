@@ -30,22 +30,26 @@ export default function VendorFinder() {
   const [editing, setEditing] = useState<{ kind: "vendor" | "event"; id: string; name: string } | null>(null);
   const [draftSlot, setDraftSlot] = useState<VendorSlot>({ date: "", start: "", end: "" });
   const [draftName, setDraftName] = useState("");
+  const [eventGuests, setEventGuests] = useState("");
+  const [draftGuests, setDraftGuests] = useState("");
   const [slotError, setSlotError] = useState<string | null>(null);
   const slotDialog = useRef<HTMLDialogElement>(null);
   function openSlot(kind: "vendor" | "event", id: string, name: string, slot?: VendorSlot) {
-    setEditing({ kind, id, name }); setDraftName(name); setDraftSlot(slot ?? { date: "", start: "", end: "" }); setSlotError(null);
+    setEditing({ kind, id, name }); setDraftName(name); setDraftSlot(slot ?? { date: "", start: "", end: "" }); setDraftGuests(id === selections.venue ? eventGuests : ""); setSlotError(null);
     slotDialog.current?.showModal();
   }
   function saveSlot() {
     if (!editing) return;
     if (!validSchedule(draftSlot) || (editing.kind === "event" && !draftName.trim())) { setSlotError("Enter a name, date, and valid same-day 24-hour start and end times."); return; }
+    if (editing.kind === "vendor" && editing.id === selections.venue && draftGuests && (!/^\d+$/.test(draftGuests) || Number(draftGuests) < 1 || !Number.isSafeInteger(Number(draftGuests)))) { setSlotError("Enter a whole number of guests greater than zero."); return; }
     clearCheck();
+    if (editing.kind === "vendor" && editing.id === selections.venue) setEventGuests(draftGuests);
     if (editing.kind === "vendor") setVendorSlots(current => ({ ...current, [editing.id]: { ...draftSlot } }));
     else setOtherEvents(current => [...current.filter(event => event.id !== editing.id), { id: editing.id, name: draftName.trim(), slot: { ...draftSlot } }]);
     slotDialog.current?.close();
   }
   function removeVendor(service: Service, id: string) {
-    clearCheck(); setSelections(current => ({ ...current, [service]: undefined }));
+    clearCheck(); if (service === "venue") setEventGuests(""); setSelections(current => ({ ...current, [service]: undefined }));
     setVendorSlots(current => { const updated = { ...current }; delete updated[id]; return updated; });
   }
   const [eventStart, setEventStart] = useState("");
@@ -93,6 +97,7 @@ export default function VendorFinder() {
   function openPlanner(vendor?: Vendor) {
     if (vendor && Object.hasOwn(serviceLabels, vendor.service)) {
       clearCheck();
+      if (vendor.service === "venue" && selections.venue !== vendor.id) setEventGuests("");
       setSelections(current => ({ ...current, [vendor.service]: vendor.id }));
     }
     if (!dialogRef.current?.open) dialogRef.current?.showModal();
@@ -156,6 +161,22 @@ export default function VendorFinder() {
         </div>
         <span className="status-pill">{directorySource === "supabase" ? "Supabase directory" : "Sample directory"}</span>
       </header>
+      <section className="panel planned-summary" aria-labelledby="planned-title">
+        <h2 id="planned-title">Your event plan</h2>
+        <p className="helper">Your selections are kept for this session. Contact each vendor to confirm a reservation.</p>
+        {!selections.venue && <p className="booking-missing">Venue not selected</p>}
+        <ul className="planned-list">{(Object.entries(serviceLabels) as [Service, string][]).map(([service, label]) => {
+          const vendor = vendors.find(v => v.id === selections[service]);
+          if (!vendor) return null;
+          const slot = vendorSlots[vendor.id];
+          const scheduled = !!slot && validSchedule(slot);
+          const others = service === "venue" ? [] : (Object.entries(selections) as [Service, string | undefined][]).filter(([key, id]) => key !== "venue" && id && id !== vendor.id).flatMap(([, id]) => { const other = vendors.find(v => v.id === id); const otherSlot = id ? vendorSlots[id] : undefined; return other && otherSlot ? [{ id: other.id, name: other.name, slot: otherSlot }] : []; });
+          const overlaps = slot ? findScheduleOverlaps({ id: vendor.id, name: vendor.name, slot }, [...others, ...otherEvents]) : [];
+          const venueSlot = selections.venue ? vendorSlots[selections.venue] : undefined;
+          const outsideVenue = service !== "venue" && !!slot && !!venueSlot && validSchedule(slot) && validSchedule(venueSlot) && (slot.date !== venueSlot.date || slot.start < venueSlot.start || slot.end > venueSlot.end);
+          return <li className="planned-item" key={service}><div><strong>{label}: {vendor.name}</strong><p>{scheduled && slot ? `${slot.date} · ${slot.start}–${slot.end}` : <span className="booking-missing">Date and time not set</span>}{service === "venue" && (eventGuests ? ` · ${eventGuests} planned guests` : <span className="booking-missing"> · Guest count not set</span>)}</p>{overlaps.length > 0 && <p className="booking-conflict">Overlaps with {overlaps.map(item => item.name).join(", ")}; review whether this is a problem.</p>}{outsideVenue && <p className="booking-conflict">Outside the venue access date or hours.</p>}</div><div className="decision-row"><button type="button" className="secondary-button" onClick={() => openSlot("vendor", vendor.id, vendor.name, slot)}>Change date and time</button><button type="button" className="secondary-button" onClick={() => removeVendor(service, vendor.id)}>Remove</button></div></li>;
+        })}</ul>
+      </section>
       <section className="panel" aria-labelledby="search-heading">
         <h2 id="search-heading">What do you need for your event?</h2>
         <p className="helper">{directorySource === "supabase"
@@ -175,8 +196,8 @@ export default function VendorFinder() {
             <div className="vendor-turn" key={index}>
               <p><strong>You:</strong> {turn.query}</p>
               <p><strong>Vendor finder:</strong> {turn.message}</p>
-              {[...turn.matches.map(vendor => ({ vendor, possible: false })), ...turn.possibleMatches.map(vendor => ({ vendor, possible: true }))].length > 0 && <ul className="vendor-results">
-                {[...turn.matches.map(vendor => ({ vendor, possible: false })), ...turn.possibleMatches.map(vendor => ({ vendor, possible: true }))].map(({ vendor, possible }) => <li className="fact" key={vendor.id}>
+              {[...turn.matches.map(vendor => ({ vendor, possible: false })), ...turn.possibleMatches.map(vendor => ({ vendor, possible: true }))].some(({ vendor }) => !Object.values(selections).includes(vendor.id)) && <ul className="vendor-results">
+                {[...turn.matches.map(vendor => ({ vendor, possible: false })), ...turn.possibleMatches.map(vendor => ({ vendor, possible: true }))].filter(({ vendor }) => !Object.values(selections).includes(vendor.id)).map(({ vendor, possible }) => <li className="fact" key={vendor.id}>
                   <div className="vendor-card-heading">
                     <div>
                       <p className="eyebrow"><span aria-hidden="true">{categoryIcons[vendor.service]}</span> {vendor.service} · {vendor.borough}</p>
@@ -222,7 +243,7 @@ export default function VendorFinder() {
           const slot = selected ? vendorSlots[selected.id] : undefined;
           const slotValid = !!slot && validTime(slot.start) && validTime(slot.end) && slot.start < slot.end;
           return <li key={service} className="booking-row"><label>{label}
-            <select value={selections[service] ?? ""} onChange={event => { clearCheck(); setSelections(current => ({ ...current, [service]: event.target.value || undefined })); }}>
+            <select value={selections[service] ?? ""} onChange={event => { clearCheck(); if (service === "venue" && event.target.value !== selections.venue) setEventGuests(""); setSelections(current => ({ ...current, [service]: event.target.value || undefined })); }}>
               <option value="">Choose {label.toLowerCase()}</option>
               {vendors.filter(v => v.service === service).map(v => <option key={v.id} value={v.id}>{v.name} · {v.borough}</option>)}
             </select></label>
@@ -262,6 +283,7 @@ export default function VendorFinder() {
       </dialog>
       <dialog ref={slotDialog} className="booking-dialog" aria-labelledby="slot-title">
         <div className="booking-heading"><h2 id="slot-title">{editing?.kind === "event" ? "Other event" : `Schedule ${editing?.name ?? "vendor"}`}</h2><button type="button" className="secondary-button" onClick={() => slotDialog.current?.close()}>Close</button></div>
+        {editing?.kind === "vendor" && editing.id === selections.venue && <label className="field">Planned number of guests <input type="number" min="1" step="1" value={draftGuests} onChange={e => setDraftGuests(e.target.value)} /></label>}
         {editing?.kind === "event" && <label className="field">Event name <input value={draftName} maxLength={120} onChange={e => setDraftName(e.target.value)} /></label>}
         <div className="booking-fields"><label className="field">Date <input type="date" value={draftSlot.date} onChange={e => setDraftSlot(current => ({ ...current, date: e.target.value }))} /></label><label className="field">Start (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="17:00" maxLength={5} value={draftSlot.start} onChange={e => setDraftSlot(current => ({ ...current, start: e.target.value }))} /></label><label className="field">End (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="19:00" maxLength={5} value={draftSlot.end} onChange={e => setDraftSlot(current => ({ ...current, end: e.target.value }))} /></label></div>
         {slotError && <p className="booking-missing" role="alert">{slotError}</p>}
