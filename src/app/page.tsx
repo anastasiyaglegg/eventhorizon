@@ -47,6 +47,7 @@ export default function Home() {
   const analysisRequestRef = useRef(0);
   const recoveryAbortRef = useRef<AbortController | null>(null);
   const analysisAbortRef = useRef<AbortController | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   function cancelRecovery() {
     recoveryRequestRef.current++;
@@ -97,6 +98,10 @@ export default function Home() {
   const pendingArrival = session?.pending?.arrival;
   const canReview = session?.status === "review-ready" && review !== null;
   const canApprove = canReview && pendingArrival != null;
+
+  useEffect(() => {
+    if (session?.status === "review-ready") resultsRef.current?.focus();
+  }, [session?.status]);
 
   function updateArrival(value: string) {
     cancelRecovery();
@@ -220,33 +225,38 @@ export default function Home() {
       <header className="page-heading">
         <div>
           <div className="eyebrow">Event Horizon</div>
-          <h1>Planning / Readiness review</h1>
+          <h1>Review a vendor arrival</h1>
           <p className="subtitle">
-            Explore one proposed vendor arrival against the seeded event. The server makes one
-            combined AI analysis call; exact timing stays calculated in application code.
+            See how an arrival change affects your event, then decide whether to approve it.
           </p>
         </div>
-        <span className="status-pill">Core P0 · Planning/readiness</span>
+        <span className="status-pill">Sample event</span>
       </header>
 
+      <nav className="review-steps" aria-label="Review steps">
+        <span className={session.status !== "review-ready" && session.status !== "approved" && session.status !== "rejected" ? "review-step current" : "review-step"}>1. Enter arrival</span>
+        <span className={session.status === "review-ready" ? "review-step current" : "review-step"}>2. Review impact</span>
+        <span className={session.status === "approved" || session.status === "rejected" ? "review-step current" : "review-step"}>3. Decide</span>
+      </nav>
       <section className="panel">
         <div className="panel-header">
           <div>
             <h2>{event.name}</h2>
-            <p className="helper">Seeded event · {event.event_date} · {event.time_zone}</p>
+            <p className="helper">Sample event · {event.event_date} · {event.time_zone}</p>
           </div>
           <span className="tag good">Local session only</span>
         </div>
+        <p className="event-vendor">Vendor: <strong>{event.vendor.name}</strong></p>
         <div className="event-meta">
           <div className="fact"><span className="fact-label">Current vendor arrival</span><span className="fact-value">{formatClock(currentArrival)}</span></div>
           <div className="fact"><span className="fact-label">Setup duration</span><span className="fact-value">{event.vendor.setup_duration_minutes === null ? "Unknown" : `${event.vendor.setup_duration_minutes} minutes`}</span></div>
           <div className="fact"><span className="fact-label">Event starts</span><span className="fact-value">{formatClock(event.start_time)}</span></div>
         </div>
-        <h3 style={{ marginTop: 24 }}>Vendor-dependent tasks</h3>
+        <h3 style={{ marginTop: 24 }}>Tasks that depend on this vendor</h3>
         <ul className="task-list">
           {dependent.map((task) => (
             <li className="task-item" key={task.task_id}>
-              <span><span className="task-name">{task.name}</span><span className="task-detail"> · {task.task_id}</span></span>
+              <span><span className="task-name">{task.name}</span></span>
               <span className="task-detail">{formatClock(task.start_time)}–{formatClock(task.end_time)}</span>
             </li>
           ))}
@@ -254,7 +264,7 @@ export default function Home() {
       </section>
 
       <section className="panel">
-        <h2>Propose a vendor arrival</h2>
+        <h2>1. Enter a proposed arrival</h2>
         <p className="helper" id="arrival-help">Enter 24-hour time in HH:MM format, such as 17:00, using the event’s local time zone. Leave blank if the arrival is unknown.</p>
         <div className="arrival-form">
           <div className="field">
@@ -263,11 +273,13 @@ export default function Home() {
               id="proposed-arrival"
               type="text"
               autoComplete="off"
+              inputMode="numeric"
               placeholder="17:00"
               maxLength={5}
               aria-describedby="arrival-help"
               value={arrivalInput}
               onChange={(eventChange) => updateArrival(eventChange.target.value)}
+              onKeyDown={(eventKey) => { if (eventKey.key === "Enter" && !busy) { eventKey.preventDefault(); void analyzeProposal(); } }}
             />
           </div>
           <button className="secondary-button" type="button" onClick={() => updateArrival("")} disabled={arrivalInput === ""}>
@@ -277,9 +289,10 @@ export default function Home() {
             {busy ? "Analyzing…" : "Analyze impact"}
           </button>
         </div>
+        <p className="footnote">Select Analyze impact to check the proposed time before deciding.</p>
         {inputError && <div className="alert" role="alert">{inputError}</div>}
         <div className="comparison">
-          <div className="comparison-card"><span className="fact-label">Current event</span><span className="fact-value">{formatClock(currentArrival)}</span></div>
+          <div className="comparison-card"><span className="fact-label">Current arrival</span><span className="fact-value">{formatClock(currentArrival)}</span></div>
           <div className="comparison-card proposed"><span className="fact-label">Proposed scenario</span><span className="fact-value">{arrivalInput ? formatClock(`${arrivalInput}:00`) : "Unknown"}</span></div>
         </div>
       </section>
@@ -288,9 +301,9 @@ export default function Home() {
       {session.status === "approved" && <div className="success" role="status">Approved locally. The session event now uses {formatClock(event.vendor.arrival_time)}.</div>}
       {session.status === "rejected" && <div className="success" role="status">Rejected locally. The session event still uses {formatClock(event.vendor.arrival_time)}.</div>}
 
-      <div className="review-grid">
+      <div className="review-grid" ref={resultsRef} tabIndex={-1} aria-label="Analysis results">
         <section className="panel result-card">
-          <h2>Exact timing <span className={`tag ${overlapTag}`}>{calculation ? overlapLabel : "Awaiting analysis"}</span></h2>
+          <h2>2. Review the timing <span className={`tag ${overlapTag}`}>{calculation ? overlapLabel : "Awaiting analysis"}</span></h2>
           {calculation ? (
             <>
               <div className="metric-grid">
@@ -298,38 +311,38 @@ export default function Home() {
                 <div className="metric"><span className="metric-label">Event starts</span><span className="metric-value">{formatClock(event.start_time)}</span></div>
                 <div className="metric"><span className="metric-label">Event-start overlap</span><span className="metric-value">{formatMinutes(calculation.overlap_minutes)}</span></div>
               </div>
-              <h3 style={{ marginTop: 24 }}>Calculated affected task IDs</h3>
+              <h3 style={{ marginTop: 24 }}>Tasks affected</h3>
               {calculation.affected_task_ids.length > 0 ? (
-                <ul className="task-list">{calculation.affected_task_ids.map((taskId) => <li className="task-item" key={taskId}><span className="task-name">{taskId}</span><span className="task-detail">dependent on vendor readiness</span></li>)}</ul>
+                <ul className="task-list">{calculation.affected_task_ids.map((taskId) => <li className="task-item" key={taskId}><span className="task-name">{event.tasks.find(task => task.task_id === taskId)?.name ?? taskId}</span><span className="task-detail">depends on vendor readiness</span></li>)}</ul>
               ) : <div className="empty-state">No dependent task is calculated as affected.</div>}
               {calculation.unknowns.length > 0 && <><h3 style={{ marginTop: 24 }}>Calculated unknowns</h3><ul className="unknown-list">{calculation.unknowns.map((unknown) => <li className="empty-state" key={unknown}>{unknown}</li>)}</ul></>}
             </>
-          ) : <div className="empty-state">Run an analysis to see setup completion and the exact code-calculated overlap.</div>}
-          <p className="footnote">These values come from deterministic server-side time calculations, not from the AI response.</p>
+          ) : <div className="empty-state">Analyze the arrival to see when setup finishes and whether it overlaps the event.</div>}
+          <p className="footnote">The app calculates these times from the event details.</p>
         </section>
 
         <section className="panel result-card">
-          <h2>Planning / Readiness findings <span className="tag good">AI interpretation</span></h2>
+          <h2>What the planning agent found <span className="tag good">AI review</span></h2>
           {analysis ? (
             <>
-              <p className="helper">Validated response · {analysis.contract_version}</p>
-              <h3 style={{ marginTop: 22 }}>Affected task IDs</h3>
-              {analysis.affected_task_ids.length > 0 ? <ul className="task-list">{analysis.affected_task_ids.map((taskId) => <li className="task-item" key={taskId}><span className="task-name">{taskId}</span></li>)}</ul> : <div className="empty-state">The AI identified no affected task IDs.</div>}
+              <p className="helper">Review the findings before deciding on the proposed time.</p>
+              <h3 style={{ marginTop: 22 }}>Affected tasks</h3>
+              {analysis.affected_task_ids.length > 0 ? <ul className="task-list">{analysis.affected_task_ids.map((taskId) => <li className="task-item" key={taskId}><span className="task-name">{event.tasks.find(task => task.task_id === taskId)?.name ?? taskId}</span></li>)}</ul> : <div className="empty-state">The planning agent identified no affected tasks.</div>}
               <h3 style={{ marginTop: 22 }}>Scheduling risks</h3>
-              {analysis.scheduling_risks.length > 0 ? <ul className="risk-list">{analysis.scheduling_risks.map((risk, index) => <li className="risk-item" key={`${risk.type}-${index}`}><div className="risk-type">{risk.type}</div><p>{risk.description}</p><strong>Evidence references</strong><ul className="evidence-list">{risk.evidence.map((evidence, evidenceIndex) => <li className="evidence-item" key={`${evidence.source}-${evidence.field}-${evidenceIndex}`}>{evidence.source}{evidence.id ? `:${evidence.id}` : ""}.{evidence.field}</li>)}</ul></li>)}</ul> : <div className="empty-state">No scheduling risk was identified.</div>}
+              {analysis.scheduling_risks.length > 0 ? <ul className="risk-list">{analysis.scheduling_risks.map((risk, index) => <li className="risk-item" key={`${risk.type}-${index}`}><div className="risk-type">{risk.type === "missing_information" ? "Information needed" : "Possible schedule conflict"}</div><p>{risk.description}</p><details><summary>See supporting details</summary><ul className="evidence-list">{risk.evidence.map((evidence, evidenceIndex) => <li className="evidence-item" key={`${evidence.source}-${evidence.field}-${evidenceIndex}`}>{evidence.source}{evidence.id ? `:${evidence.id}` : ""}.{evidence.field}</li>)}</ul></details></li>)}</ul> : <div className="empty-state">No scheduling risk was identified.</div>}
               <h3 style={{ marginTop: 22 }}>Unknowns</h3>
               {analysis.unknowns.length > 0 ? <ul className="unknown-list">{analysis.unknowns.map((unknown) => <li className="empty-state" key={unknown}>{unknown}</li>)}</ul> : <div className="empty-state">No unknown information was reported.</div>}
               <h3 style={{ marginTop: 22 }}>Recommendation</h3>
               <p>{analysis.recommendation.action}</p>
             </>
-          ) : <div className="empty-state">Run an analysis to see the validated combined Planning/Readiness report.</div>}
+          ) : <div className="empty-state">Analyze the arrival to see the planning agent’s findings and recommendation.</div>}
           <p className="footnote">AI findings are interpretation only. They cannot change event data or approve a proposal.</p>
         </section>
       </div>
 
       <section className="panel">
-        <h2>Review proposed change</h2>
-        <p className="helper">Approval is a local session action. It does not call an external approval backend.</p>
+        <h2>3. Decide on the proposed time</h2>
+        <p className="helper">Choose whether to use the proposed arrival in this session.</p>
         <div className="comparison">
           <div className="comparison-card"><span className="fact-label">Current arrival</span><span className="fact-value">{formatClock(currentArrival)}</span></div>
           <div className="comparison-card proposed"><span className="fact-label">Proposed arrival</span><span className="fact-value">{pendingArrival ? formatClock(pendingArrival) : "Unknown"}</span></div>
@@ -338,7 +351,7 @@ export default function Home() {
           <button className="decision-button approve" type="button" onClick={() => makeDecision("approve")} disabled={!canApprove || busy}>Approve locally</button>
           <button className="decision-button reject" type="button" onClick={() => makeDecision("reject")} disabled={!canReview || busy}>Reject locally</button>
         </div>
-        <p className="footnote">Approve is disabled until a valid analysis exists and a proposed arrival is present. Reject preserves the current session event.</p>
+        <p className="footnote">{!canReview ? "Analyze a proposed arrival first to enable a decision." : !canApprove ? "The arrival is unknown. Enter a time and analyze it to enable approval." : "Review the impact above, then approve or reject the change."}</p>
       </section>
 
       <details className="panel recovery-panel">
