@@ -3,6 +3,9 @@ import directory from "../data/vendors.json";
 const services = [
   { name: "bakery", pattern: /\b(?:bread|bakery|bakeries|baker|dinner rolls?|sourdough|focaccia)\b/i },
   { name: "catering", pattern: /\b(?:caterer(?:s)?|catering|food)\b/i },
+  { name: "florist", pattern: /\b(?:florists?|florals?|flowers?)\b/i },
+  { name: "decorator", pattern: /\b(?:decorators?|decorations?|decor|event design)\b/i },
+  { name: "entertainment", pattern: /\b(?:entertainment|entertainers?|djs?|bands?)\b/i },
   { name: "venue", pattern: /\b(?:venue(?:s)?|event space)\b/i },
   { name: "AV", pattern: /\b(?:av|audio[ -]?visual|sound|lighting)\b/i },
   { name: "photography", pattern: /\b(?:photo(?:graphy|grapher)?s?)\b/i },
@@ -42,6 +45,9 @@ export function normalizeVendorService(service: string) {
   if (["caterer", "caterers", "food"].includes(normalized)) return "catering";
   if (["baker", "bakers", "bakeries"].includes(normalized)) return "bakery";
   if (["audio visual", "audio-visual", "sound", "lighting"].includes(normalized)) return "av";
+  if (["florists", "floral", "florals", "flowers"].includes(normalized)) return "florist";
+  if (["decorators", "decoration", "decorations", "decor", "event design"].includes(normalized)) return "decorator";
+  if (["entertainer", "entertainers", "dj", "djs", "band", "bands"].includes(normalized)) return "entertainment";
   if (["photo", "photographer", "photographers", "photo services"].includes(normalized)) return "photography";
   return normalized;
 }
@@ -89,7 +95,7 @@ export function searchVendors(query: string, previous: VendorCriteria, vendors: 
   if (guestCount) next.guests = Number(guestCount[1].replaceAll(",", ""));
   if (budget) next.budget = Number(budget[1].replaceAll(",", "")) * (budget[2] ? 1000 : 1);
   if (!next.service) {
-    return { criteria: next, message: "What service do you need: catering, a bakery, a venue, AV, or photography?", matches: [], possibleMatches: [] };
+    return { criteria: next, message: "What service do you need: catering, a bakery, a florist, a venue, AV, photography, decor, or entertainment?", matches: [], possibleMatches: [] };
   }
 
   const classified = vendors.flatMap((vendor) => {
