@@ -8,7 +8,7 @@ import { vendorPlanToAnalysis } from "../../lib/vendor-planning";
 import { findScheduleOverlaps, validSchedule, type NamedSchedule } from "../../lib/schedule-conflicts";
 import type { ReviewPacket } from "../../lib/contract";
 import type { RecoveryOutput } from "../../lib/recovery-contract";
-import { capacityLabel, samplePrice, sampleVendors, searchVendors, type VendorCriteria, type Vendor } from "../../lib/vendor-search";
+import { capacityLabel, samplePrice, sampleVendors, searchVendors, searchVendorNames, type VendorCriteria, type Vendor } from "../../lib/vendor-search";
 
 const example = "Find a caterer in Brooklyn for 80 guests under $3,000";
 const categoryIcons: Record<string, string> = {
@@ -24,6 +24,7 @@ type Turn = { query: string; message: string; matches: Vendor[]; possibleMatches
 
 export default function VendorFinder() {
   const [query, setQuery] = useState("");
+  const [nameQuery, setNameQuery] = useState("");
   const [selections, setSelections] = useState<Selections>({});
   const [vendorSlots, setVendorSlots] = useState<Record<string, VendorSlot>>({});
   const [otherEvents, setOtherEvents] = useState<NamedSchedule[]>([]);
@@ -144,6 +145,17 @@ export default function VendorFinder() {
     setCriteria(result.criteria); setTurns([{ query: serviceLabels[service], message: result.message, matches: result.matches, possibleMatches: result.possibleMatches }]); setQuery("");
   }
 
+  function searchByName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const name = nameQuery.trim();
+    if (name.length < 2) return;
+    const found = searchVendorNames(name, vendors);
+    const visible = found.filter(vendor => !Object.values(selections).includes(vendor.id));
+    const message = found.length === 0 ? `No vendors found with “${name}” in their name.` : visible.length === 0 ? "This vendor is already in your event plan." : `Found ${visible.length} ${visible.length === 1 ? "vendor" : "vendors"} matching “${name}”.`;
+    setCriteria({});
+    setTurns([{ query: name, message, matches: visible, possibleMatches: [] }]);
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     search(query);
@@ -187,6 +199,12 @@ export default function VendorFinder() {
         {directorySource === "supabase" && vendors.length === 0 && <p className="empty-state">No valid vendor listings are available yet. Add or correct records in Supabase.</p>}
         <h3>Browse by category</h3>
         <div className="vendor-categories" aria-label="Vendor categories">{(Object.entries(serviceLabels) as [Service, string][]).map(([service, label]) => <button className="secondary-button" type="button" key={service} onClick={() => browseCategory(service)}><span aria-hidden="true">{categoryIcons[service]}</span> {label}</button>)}</div>
+        <form className="vendor-name-search" onSubmit={searchByName} aria-label="Find a vendor by name">
+          <label className="field">Find a specific vendor
+            <input value={nameQuery} onChange={event => setNameQuery(event.target.value)} placeholder="Type a business name, e.g. Buds of Brooklyn" maxLength={200} />
+          </label>
+          <button className="primary-button" disabled={nameQuery.trim().length < 2}>Search by name</button>
+        </form>
         <button className="secondary-button" type="button" onClick={() => openPlanner()}>View booking plan</button>
         <button className="secondary-button vendor-example" type="button" onClick={() => search(example)}>
           {example}
