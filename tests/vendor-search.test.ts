@@ -66,6 +66,12 @@ test("recognizes added vendor categories and normalizes directory values", () =>
   }
 });
 
+test("the service named first wins when a request mentions several", () => {
+  for (const [query, service] of [["venue with flowers", "venue"], ["venue in Brooklyn with a live band", "venue"], ["flowers for the venue", "florist"], ["DJ with sound", "entertainment"], ["bread for 80 guests", "bakery"]] as const) {
+    assert.equal(searchVendors(query, {}, sampleVendors).criteria.service, service, query);
+  }
+});
+
 test("vendor name lookup is case-insensitive, partial, and independent of prior filters", () => {
   const directory = [{ ...sampleVendors[0], name: "Buds of Brooklyn" }, { ...sampleVendors[0], id: "other", name: "Other Vendor" }];
   assert.deepEqual(searchVendorNames("  bUdS  ", directory).map(v => v.name), ["Buds of Brooklyn"]);

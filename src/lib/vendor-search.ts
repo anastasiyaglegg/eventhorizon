@@ -87,7 +87,11 @@ export function searchVendorNames(query: string, vendors: Vendor[] = sampleVendo
 
 export function searchVendors(query: string, previous: VendorCriteria, vendors: Vendor[] = sampleVendors) {
   const next = { ...previous };
-  const service = services.find(({ pattern }) => pattern.test(query));
+  // When a request mentions several services ("venue with flowers"), use the one named first.
+  const service = services
+    .map(item => ({ item, at: query.search(item.pattern) }))
+    .filter(({ at }) => at >= 0)
+    .sort((a, b) => a.at - b.at)[0]?.item;
   const places = boroughs.filter(borough => new RegExp(`\\b${borough.replace(" ", "\\s+")}\\b`, "i").test(query));
   const guestCount = query.match(/\b([\d,]+)\s*(?:guests?|people|attendees?)\b/i);
   const budget = query.match(/(?:\$\s*|\bbudget(?:\s+(?:of|is))?\s+)([\d,]+(?:\.\d+)?)\s*(k\b)?/i);

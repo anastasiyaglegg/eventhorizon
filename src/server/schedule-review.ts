@@ -9,7 +9,7 @@ const recoverySchema = z.object({ suggestions: z.array(z.object({ issue_id: z.st
 type Planning = z.infer<typeof planningSchema>;
 type Recovery = z.infer<typeof recoverySchema>;
 type Agent = (input: { issues: ScheduleIssue[]; planning?: Planning }, signal?: AbortSignal) => Promise<unknown>;
-const permitted = { missing_slot: ["provide_schedule"], catering_arrival: ["adjust_arrival", "confirm_schedule"], catering_finish: ["adjust_finish", "confirm_schedule"], too_early: ["adjust_arrival", "confirm_schedule"], decor_too_early: ["adjust_arrival", "confirm_schedule"] } as const;
+const permitted = { missing_slot: ["provide_schedule"], catering_arrival: ["adjust_arrival", "confirm_schedule"], catering_finish: ["adjust_finish", "confirm_schedule"], too_early: ["adjust_arrival", "confirm_schedule"], decor_too_early: ["adjust_arrival", "confirm_schedule"], late_arrival: ["adjust_arrival", "confirm_schedule"] } as const;
 const actionLabels = { provide_schedule: "Enter the vendor's date and time.", adjust_arrival: "Review and adjust the vendor's arrival time.", adjust_finish: "Review and adjust the vendor's finish time.", confirm_schedule: "Confirm the timing with the vendor before making a change." };
 
 function completeIds(items: { issue_id: string }[], issues: ScheduleIssue[]) {
@@ -20,10 +20,11 @@ export async function reviewSchedule(value: unknown, planningAgent: Agent, recov
   const { input, issues } = evaluateSchedule(value);
   const runId = randomUUID();
   const snapshotHash = createHash("sha256").update(JSON.stringify(input)).digest("hex");
+  // With no rule findings there is nothing for either agent to review, so skip both AI calls.
+  if (!issues.length) return { version: "schedule-review.v1", run_id: runId, snapshot_hash: snapshotHash, issues, findings: [], suggestions: [] };
   const planning = planningSchema.safeParse(await planningAgent({ issues: structuredClone(issues) }, signal));
   if (!planning.success || !completeIds(planning.data.findings, issues)) throw new Error("The Planning Agent returned an invalid report.");
   if (signal?.aborted) throw new Error("The schedule check was cancelled.");
-  if (!issues.length) return { version: "schedule-review.v1", run_id: runId, snapshot_hash: snapshotHash, issues, findings: [], suggestions: [] };
   const recovery = recoverySchema.safeParse(await recoveryAgent({ issues: structuredClone(issues), planning: structuredClone(planning.data) }, signal));
   if (!recovery.success || !completeIds(recovery.data.suggestions, issues)) throw new Error("The Recovery Agent returned an invalid report.");
   for (const suggestion of recovery.data.suggestions) {
