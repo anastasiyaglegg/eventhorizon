@@ -12,18 +12,19 @@ const categoryIcons: Record<string, string> = {
 const serviceLabels = { venue: "Venue", catering: "Caterer", florist: "Florist", entertainment: "DJ / entertainment", bakery: "Bakery", av: "AV", photography: "Photographer", decorator: "Decorator" } as const;
 type Service = keyof typeof serviceLabels;
 type Selections = Partial<Record<Service, string>>;
+type VendorSlot = { date: string; start: string; end: string };
 
 type Turn = { query: string; message: string; matches: Vendor[]; possibleMatches: Vendor[] };
 
 export default function VendorFinder() {
   const [query, setQuery] = useState("");
   const [selections, setSelections] = useState<Selections>({});
-  const [eventDate, setEventDate] = useState("");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [vendorSlots, setVendorSlots] = useState<Record<string, VendorSlot>>({});
+  function updateSlot(id: string, field: keyof VendorSlot, value: string) {
+    setVendorSlots(current => ({ ...current, [id]: { ...(current[id] ?? { date: "", start: "", end: "" }), [field]: value } }));
+  }
   const dialogRef = useRef<HTMLDialogElement>(null);
   const validTime = (value: string) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
-  const slotValid = validTime(startTime) && validTime(endTime) && startTime < endTime;
   function openPlanner(vendor?: Vendor) {
     if (vendor && Object.hasOwn(serviceLabels, vendor.service)) {
       setSelections(current => ({ ...current, [vendor.service]: vendor.id }));
@@ -142,22 +143,26 @@ export default function VendorFinder() {
       <dialog ref={dialogRef} className="booking-dialog" aria-labelledby="booking-title">
         <div className="booking-heading"><h2 id="booking-title">Event booking plan</h2><button type="button" className="secondary-button" onClick={() => dialogRef.current?.close()}>Close</button></div>
         <p className="helper">Plan selections for this session. These are not confirmed bookings; contact each business to reserve.</p>
-        <div className="booking-fields">
-          <label className="field">Event date <input type="date" value={eventDate} onChange={event => setEventDate(event.target.value)} /></label>
-          <label className="field">Start time (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="17:00" maxLength={5} value={startTime} onChange={event => setStartTime(event.target.value)} /></label>
-          <label className="field">End time (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="19:00" maxLength={5} value={endTime} onChange={event => setEndTime(event.target.value)} /></label>
-        </div>
-        {!eventDate && <p className="booking-missing">Missing: event date</p>}
-        {!slotValid && <p className="booking-missing">Missing or invalid: enter a same-day time slot in 24-hour format (end after start).</p>}
         <p>Venue: {vendors.find(v => v.id === selections.venue)?.name ?? <span className="booking-missing">Missing venue</span>}</p>
         <ul className="booking-list">{(Object.entries(serviceLabels) as [Service, string][]).map(([service, label]) => {
           const selected = vendors.find(v => v.id === selections[service]);
+          const slot = selected ? vendorSlots[selected.id] : undefined;
+          const slotValid = !!slot && validTime(slot.start) && validTime(slot.end) && slot.start < slot.end;
           return <li key={service} className="booking-row"><label>{label}
             <select value={selections[service] ?? ""} onChange={event => setSelections(current => ({ ...current, [service]: event.target.value || undefined }))}>
               <option value="">Choose {label.toLowerCase()}</option>
               {vendors.filter(v => v.service === service).map(v => <option key={v.id} value={v.id}>{v.name} · {v.borough}</option>)}
             </select></label>
-            {selected ? <span>Selected: {selected.name} {selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Visit website</a>}</span> : <span className="booking-missing">Missing {label.toLowerCase()}</span>}
+            {selected ? <>
+              <span>Selected: {selected.name} {selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Visit website</a>}</span>
+              <div className="booking-fields">
+                <label className="field">{label} date <input type="date" value={slot?.date ?? ""} onChange={event => updateSlot(selected.id, "date", event.target.value)} /></label>
+                <label className="field">{label} start (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="17:00" maxLength={5} value={slot?.start ?? ""} onChange={event => updateSlot(selected.id, "start", event.target.value)} /></label>
+                <label className="field">{label} end (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="19:00" maxLength={5} value={slot?.end ?? ""} onChange={event => updateSlot(selected.id, "end", event.target.value)} /></label>
+              </div>
+              {!slot?.date && <span className="booking-missing">Missing date for {selected.name}</span>}
+              {!slotValid && <span className="booking-missing">Missing or invalid time for {selected.name}: enter a same-day 24-hour slot with the end after the start.</span>}
+            </> : <span className="booking-missing">Missing {label.toLowerCase()}</span>}
           </li>;
         })}</ul>
       </dialog>
