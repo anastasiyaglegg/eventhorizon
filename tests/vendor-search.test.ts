@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sampleVendors, searchVendors, type Vendor } from "../src/lib/vendor-search";
+import { sampleVendors, searchVendors, searchVendorNames, type Vendor } from "../src/lib/vendor-search";
 
 const realVendor: Vendor = {
   id: "f7d6d6e4-1e9d-4b63-8e55-0321eab8e94b",
@@ -64,4 +64,11 @@ test("recognizes added vendor categories and normalizes directory values", () =>
     assert.equal(result.criteria.service, service);
     assert.equal(result.matches.length + result.possibleMatches.length, 1);
   }
+});
+
+test("vendor name lookup is case-insensitive, partial, and independent of prior filters", () => {
+  const directory = [{ ...sampleVendors[0], name: "Buds of Brooklyn" }, { ...sampleVendors[0], id: "other", name: "Other Vendor" }];
+  assert.deepEqual(searchVendorNames("  bUdS  ", directory).map(v => v.name), ["Buds of Brooklyn"]);
+  assert.deepEqual(searchVendorNames("not a business", directory), []);
+  assert.deepEqual(searchVendorNames("b", directory), []);
 });
