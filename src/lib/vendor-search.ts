@@ -78,6 +78,13 @@ export function describeCriteria(criteria: VendorCriteria) {
   ].filter(Boolean).join(" · ");
 }
 
+/** Search only names in the supplied directory, independent of prior filters. */
+export function searchVendorNames(query: string, vendors: Vendor[] = sampleVendors): Vendor[] {
+  const name = query.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
+  if (name.length < 2) return [];
+  return vendors.filter(vendor => vendor.name.replace(/\s+/g, " ").toLocaleLowerCase("en-US").includes(name));
+}
+
 export function searchVendors(query: string, previous: VendorCriteria, vendors: Vendor[] = sampleVendors) {
   const next = { ...previous };
   const service = services.find(({ pattern }) => pattern.test(query));
