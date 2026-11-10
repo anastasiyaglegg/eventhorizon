@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sampleVendors, searchVendors, type Vendor } from "../src/lib/vendor-search";
+import { sampleVendors, searchVendors, searchVendorNames, type Vendor } from "../src/lib/vendor-search";
 
 const realVendor: Vendor = {
   id: "f7d6d6e4-1e9d-4b63-8e55-0321eab8e94b",
@@ -55,4 +55,26 @@ test("vendors with missing price or capacity remain visible as possible matches"
   const result = searchVendors("bakery in Brooklyn for 80 guests under $600", {}, [incomplete]);
   assert.equal(result.matches.length, 0);
   assert.equal(result.possibleMatches[0].id, incomplete.id);
+});
+
+test("recognizes added vendor categories and normalizes directory values", () => {
+  for (const [query, service] of [["flowers in Brooklyn", "florist"], ["event decorators in Brooklyn", "decorator"], ["DJ in Brooklyn", "entertainment"]] as const) {
+    const vendor = { ...sampleVendors[0], service: service === "florist" ? "Florists" : service === "decorator" ? "Decor" : "DJ", borough: "Brooklyn" };
+    const result = searchVendors(query, {}, [vendor]);
+    assert.equal(result.criteria.service, service);
+    assert.equal(result.matches.length + result.possibleMatches.length, 1);
+  }
+});
+
+test("the service named first wins when a request mentions several", () => {
+  for (const [query, service] of [["venue with flowers", "venue"], ["venue in Brooklyn with a live band", "venue"], ["flowers for the venue", "florist"], ["DJ with sound", "entertainment"], ["bread for 80 guests", "bakery"]] as const) {
+    assert.equal(searchVendors(query, {}, sampleVendors).criteria.service, service, query);
+  }
+});
+
+test("vendor name lookup is case-insensitive, partial, and independent of prior filters", () => {
+  const directory = [{ ...sampleVendors[0], name: "Buds of Brooklyn" }, { ...sampleVendors[0], id: "other", name: "Other Vendor" }];
+  assert.deepEqual(searchVendorNames("  bUdS  ", directory).map(v => v.name), ["Buds of Brooklyn"]);
+  assert.deepEqual(searchVendorNames("not a business", directory), []);
+  assert.deepEqual(searchVendorNames("b", directory), []);
 });
