@@ -94,6 +94,12 @@ p { line-height: 1.55; }
 .recovery-panel > summary strong { display: block; margin-top: 4px; }
 .recovery-panel[open] > summary { margin-bottom: 14px; }
 .recovery-task-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.recovery-review-note { margin-top: 8px; }
+.recovery-task-dismissed { opacity: 0.72; border-left: 4px solid var(--line); }
+.recovery-review-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.recovery-choice { padding: 8px 11px; font-size: 0.84rem; }
+.recovery-choice.keep[aria-pressed="true"] { color: var(--green); background: var(--green-soft); outline: 2px solid #a9dbc0; }
+.recovery-choice.dismiss[aria-pressed="true"] { color: var(--red); background: var(--red-soft); outline: 2px solid #efbfc0; }
 
 @media (max-width: 760px) {
   .page-shell { width: min(100% - 22px, 680px); padding-top: 24px; }
