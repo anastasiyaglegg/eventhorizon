@@ -70,7 +70,7 @@ export default function VendorFinder() {
       <section className="panel" aria-labelledby="search-heading">
         <h2 id="search-heading">What do you need for your event?</h2>
         <p className="helper">{directorySource === "supabase"
-          ? "Vendor details come from the connected directory. Confirm prices, ratings, and availability with each vendor."
+          ? "Vendor details come from the connected directory. Prices, capacity, and availability marked demo are fictional. Confirm real details with each vendor."
           : "Sample vendors, contacts, prices, ratings, and reviews are fictional. Availability is unknown."}</p>
         {directoryError && <p className="alert" role="alert">{directoryError}</p>}
         {directoryWarning && <p className="alert" role="status">{directoryWarning}</p>}
@@ -94,7 +94,8 @@ export default function VendorFinder() {
                     {vendor.rating !== null && <span className="tag good"><span aria-hidden="true">★&nbsp;</span> {vendor.rating.toFixed(1)} / 5 {vendor.isSynthetic ? "sample rating" : `rating${vendor.reviewCount === null ? "" : ` · ${vendor.reviewCount} reviews`}`}</span>}
                   </div>
                   <p>{vendor.details}</p>
-                  <p className="helper">{vendor.isSynthetic ? "Sample price" : "Listed price"} {samplePrice(vendor)} · Capacity {capacityLabel(vendor)} · Availability unknown</p>
+                  <p className="helper">{vendor.priceMin === null && vendor.priceMax === null ? "Demo price $2,000 (fictional)" : `${vendor.isSynthetic ? "Sample price" : "Listed price"} ${samplePrice(vendor)}`} · {vendor.capacityMin === null && vendor.capacityMax === null ? "Demo capacity 100 guests (fictional)" : `Capacity ${capacityLabel(vendor)}`} · Demo availability: available (fictional)</p>
+                  <p className="helper">Demo values are examples only and are not used to determine matches. Contact the vendor to confirm actual details.</p>
                   {(vendor.contactEmail || vendor.sourceUrl) && <p className="helper">{vendor.isSynthetic ? "Sample contact" : "Contact"} {vendor.contactEmail && <span className="vendor-contact">{vendor.contactEmail}</span>}{vendor.contactEmail && vendor.sourceUrl && " · "}{vendor.sourceUrl && <a href={vendor.sourceUrl} target="_blank" rel="noreferrer">Source</a>}</p>}
                   {vendor.review && <blockquote className="vendor-review">
                     <span className="fact-label">{vendor.isSynthetic ? "Sample review" : "Review summary"}</span>
