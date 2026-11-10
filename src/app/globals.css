@@ -112,6 +112,9 @@ p { line-height: 1.55; }
 
 .vendor-finder { max-width: 860px; }
 .vendor-finder-heading { margin-top: 22px; }
+.event-theme { color: var(--blue); font-weight: 750; margin: 0 0 12px; }
+.event-name-field { margin: 18px 0 14px; max-width: 440px; font-weight: 700; }
+.event-name-field input { width: 100%; }
 .scope-note { color: var(--muted); font-size: 0.9rem; margin: 12px 0 0; }
 .vendor-example { margin-top: 16px; text-align: left; }
 .vendor-turn { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; overflow-wrap: anywhere; }
@@ -127,6 +130,9 @@ p { line-height: 1.55; }
 .booking-dialog { width: min(720px, calc(100% - 32px)); max-height: 85vh; overflow-y: auto; border: 1px solid #c8d1d7; border-radius: 14px; padding: 24px; color: #172735; background: white; }
 .booking-dialog::backdrop { background: rgba(10, 25, 35, .6); }
 .booking-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.booking-heading .eyebrow { margin-bottom: 6px; }
+.booking-heading h2 { font-size: clamp(1.35rem, 4vw, 1.8rem); }
+.booking-heading .event-theme { margin-bottom: 4px; }
 .booking-fields { display: flex; flex-wrap: wrap; gap: 12px; }
 .booking-fields .field { flex: 1 1 150px; }
 .booking-missing { color: #a51d25; font-weight: 700; }
