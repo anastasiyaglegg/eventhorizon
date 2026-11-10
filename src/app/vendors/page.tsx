@@ -286,7 +286,15 @@ export default function VendorFinder() {
         {editing?.kind === "event" && <label className="field">Event name <input value={draftName} maxLength={120} onChange={e => setDraftName(e.target.value)} /></label>}
         <div className="booking-fields"><label className="field">Date <input type="date" value={draftSlot.date} onChange={e => setDraftSlot(current => ({ ...current, date: e.target.value }))} /></label><label className="field">Start (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="17:00" maxLength={5} value={draftSlot.start} onChange={e => setDraftSlot(current => ({ ...current, start: e.target.value }))} /></label><label className="field">End (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="19:00" maxLength={5} value={draftSlot.end} onChange={e => setDraftSlot(current => ({ ...current, end: e.target.value }))} /></label></div>
         {slotError && <p className="booking-missing" role="alert">{slotError}</p>}
-        {editing?.kind === "vendor" && <div><h3>Other planned vendors</h3><ul>{(Object.entries(selections) as [Service, string | undefined][]).filter(([, id]) => id && id !== editing.id).map(([service, id]) => { const vendor = vendors.find(v => v.id === id); const slot = id ? vendorSlots[id] : undefined; return vendor ? <li key={service}>{vendor.name}: {slot && validSchedule(slot) ? `${slot.date} · ${slot.start}–${slot.end}` : "time not set"}</li> : null; })}</ul></div>}
+        {editing?.kind === "vendor" && (() => {
+          const scheduled = (Object.entries(selections) as [Service, string | undefined][]).flatMap(([service, id]) => {
+            if (service === "venue" || !id || id === editing.id) return [];
+            const vendor = vendors.find(item => item.id === id);
+            const slot = vendorSlots[id];
+            return vendor && slot && validSchedule(slot) ? [{ service, vendor, slot }] : [];
+          });
+          return <div><h3>Other scheduled vendors for this event</h3>{scheduled.length ? <ul>{scheduled.map(({ service, vendor, slot }) => <li key={service}>{vendor.name}: {slot.date} · {slot.start}–{slot.end}</li>)}</ul> : <p>No other vendors scheduled for this event yet.</p>}</div>;
+        })()}
         <div className="decision-row"><button type="button" className="primary-button" onClick={saveSlot}>Save time</button><button type="button" className="secondary-button" onClick={() => slotDialog.current?.close()}>Cancel</button></div>
       </dialog>
     </main>
