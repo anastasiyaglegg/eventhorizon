@@ -2,18 +2,20 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { DateTime } from "luxon";
 import { useEventPlan } from "../../client/event-plan";
 import { validSchedule, type NamedSchedule, type ScheduleSlot } from "../../lib/schedule-conflicts";
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const pad = (value: number) => String(value).padStart(2, "0");
-const dateKey = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+const zone = "America/New_York";
+const fromDate = (date: string) => DateTime.fromISO(date, { zone });
+const today = () => DateTime.now().setZone(zone);
 
 export default function CalendarPage() {
   const { plan, setField, vendors } = useEventPlan();
-  const initial = plan.eventDate && /^\d{4}-\d{2}-\d{2}$/.test(plan.eventDate) ? new Date(`${plan.eventDate}T12:00:00`) : new Date();
-  const [month, setMonth] = useState(() => new Date(initial.getFullYear(), initial.getMonth(), 1));
-  const [selectedDate, setSelectedDate] = useState(() => dateKey(initial));
+  const initial = plan.eventDate && fromDate(plan.eventDate).isValid ? fromDate(plan.eventDate) : today();
+  const [month, setMonth] = useState(() => initial.startOf("month"));
+  const [selectedDate, setSelectedDate] = useState(() => initial.toISODate() ?? "");
   const [name, setName] = useState("");
   const [start, setStart] = useState("17:00");
   const [end, setEnd] = useState("19:00");
@@ -29,10 +31,9 @@ export default function CalendarPage() {
     setPrimaryEnd(plan.eventEnd || "20:00");
   }, [plan.name, plan.eventStart, plan.eventEnd]);
   useEffect(() => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(plan.eventDate)) return;
-    const eventDay = new Date(`${plan.eventDate}T12:00:00`);
-    if (Number.isNaN(eventDay.getTime())) return;
-    setMonth(new Date(eventDay.getFullYear(), eventDay.getMonth(), 1));
+    const eventDay = fromDate(plan.eventDate);
+    if (!eventDay.isValid || eventDay.toISODate() !== plan.eventDate) return;
+    setMonth(eventDay.startOf("month"));
     setSelectedDate(plan.eventDate);
   }, [plan.eventDate]);
 
@@ -48,9 +49,10 @@ export default function CalendarPage() {
     return result.sort((a, b) => a.slot.date.localeCompare(b.slot.date) || a.slot.start.localeCompare(b.slot.start));
   }, [plan, vendors]);
 
-  const gridStart = new Date(month.getFullYear(), month.getMonth(), 1 - new Date(month.getFullYear(), month.getMonth(), 1).getDay());
-  const days = Array.from({ length: 42 }, (_, index) => new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + index));
+  const gridStart = month.startOf("month").minus({ days: month.weekday % 7 });
+  const days = Array.from({ length: 42 }, (_, index) => gridStart.plus({ days: index }));
   const selectedEntries = entries.filter(item => item.slot.date === selectedDate);
+  const runSheet = entries.filter(item => item.kind !== "other");
 
   function saveOther(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,7 +63,7 @@ export default function CalendarPage() {
     setName(""); setStart("17:00"); setEnd("19:00"); setEditingId(null); setError(null);
   }
   function editOther(item: NamedSchedule) {
-    setSelectedDate(item.slot.date); setMonth(new Date(`${item.slot.date}T12:00:00`));
+    setSelectedDate(item.slot.date); setMonth(fromDate(item.slot.date).startOf("month"));
     setEditingId(item.id); setName(item.name); setStart(item.slot.start); setEnd(item.slot.end); setError(null);
   }
   function removeOther(id: string) {
@@ -82,17 +84,18 @@ export default function CalendarPage() {
   }
 
   return <main className="page-shell workspace-page">
-    <header className="workspace-heading"><div><p className="eyebrow">The whole orbit</p><h1>Visual calendar</h1><p>See events and vendor setup on the dates they happen. This calendar is saved only in this browser session.</p></div><Link className="primary-button" href="/vendors">Search &amp; add vendors →</Link></header>
+    <header className="workspace-heading"><div><p className="eyebrow">The whole orbit</p><h1>Visual calendar</h1><p>See your events and vendor setup together. Your plan is saved on this device; use Save &amp; share to work with someone else.</p></div><Link className="primary-button" href="/vendors">Search &amp; add vendors →</Link></header>
     <div className="calendar-layout">
       <section className="calendar-panel" aria-label="Event calendar">
-        <div className="calendar-toolbar"><h2>{month.toLocaleString("en-US", { month: "long", year: "numeric" })}</h2><div><button className="calendar-icon-button" type="button" aria-label="Previous month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>←</button><button className="calendar-icon-button" type="button" onClick={() => { const today = new Date(); setMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setSelectedDate(dateKey(today)); }}>Today</button><button className="calendar-icon-button" type="button" aria-label="Next month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>→</button></div></div>
-        <div className="calendar-grid">{weekdays.map(day => <strong className="calendar-weekday" key={day}>{day}</strong>)}{days.map(day => { const key = dateKey(day); const items = entries.filter(item => item.slot.date === key); return <button type="button" key={key} className={`calendar-day ${day.getMonth() === month.getMonth() ? "" : "outside"} ${selectedDate === key ? "active" : ""}`} aria-label={`${key}, ${items.length} scheduled items`} aria-pressed={selectedDate === key} onClick={() => setSelectedDate(key)}><span>{day.getDate()}</span><span className="calendar-day-items">{items.slice(0, 3).map(item => <small key={`${item.kind}-${item.id}`} className={`calendar-chip ${item.kind}`}>{item.slot.start} {item.name}</small>)}{items.length > 3 && <small className="calendar-more">+{items.length - 3} more</small>}</span></button>; })}</div>
+        <div className="calendar-toolbar"><h2>{month.toLocaleString({ month: "long", year: "numeric" })}</h2><div><button className="calendar-icon-button" type="button" aria-label="Previous month" onClick={() => setMonth(month.minus({ months: 1 }))}>←</button><button className="calendar-icon-button" type="button" onClick={() => { const current = today(); setMonth(current.startOf("month")); setSelectedDate(current.toISODate() ?? ""); }}>Today</button><button className="calendar-icon-button" type="button" aria-label="Next month" onClick={() => setMonth(month.plus({ months: 1 }))}>→</button></div></div>
+        <div className="calendar-grid">{weekdays.map(day => <strong className="calendar-weekday" key={day}>{day}</strong>)}{days.map(day => { const key = day.toISODate() ?? ""; const items = entries.filter(item => item.slot.date === key); return <button type="button" key={key} className={`calendar-day ${day.month === month.month ? "" : "outside"} ${selectedDate === key ? "active" : ""}`} aria-label={`${key}, ${items.length} scheduled items`} aria-pressed={selectedDate === key} onClick={() => setSelectedDate(key)}><span>{day.day}</span><span className="calendar-day-items">{items.slice(0, 3).map(item => <small key={`${item.kind}-${item.id}`} className={`calendar-chip ${item.kind}`}>{item.slot.start} {item.name}</small>)}{items.length > 3 && <small className="calendar-more">+{items.length - 3} more</small>}</span></button>; })}</div>
       </section>
       <aside className="calendar-sidebar">
-        <section className="panel"><p className="eyebrow">Selected date</p><h2>{new Date(`${selectedDate}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</h2>{selectedEntries.length ? <ul className="agenda-list">{selectedEntries.map(item => <li key={`${item.kind}-${item.id}`}><span className={`agenda-dot ${item.kind}`} /><div><strong>{item.name}</strong><p>{item.slot.start}–{item.slot.end} · {item.kind === "vendor" ? "Vendor" : "Event"}</p>{item.kind === "other" && <div className="agenda-actions"><button type="button" onClick={() => editOther(item)}>Edit</button><button type="button" onClick={() => removeOther(item.id)}>Cancel event</button></div>}</div></li>)}</ul> : <p className="helper">Nothing planned for this date yet.</p>}</section>
-        <section className="panel"><h2>{editingId ? "Edit event" : "Add an event"}</h2><form className="calendar-form" onSubmit={saveOther}><label>Event name<input value={name} maxLength={120} onChange={event => setName(event.target.value)} placeholder="A very good party" /></label><label>Date<input type="date" value={selectedDate} onChange={event => { if (!event.target.value) return; setSelectedDate(event.target.value); setMonth(new Date(`${event.target.value}T12:00:00`)); }} /></label><div className="calendar-time-fields"><label>Start (24h)<input value={start} maxLength={5} placeholder="17:00" onChange={event => setStart(event.target.value)} /></label><label>End (24h)<input value={end} maxLength={5} placeholder="19:00" onChange={event => setEnd(event.target.value)} /></label></div>{error && <p className="alert" role="alert">{error}</p>}<button className="primary-button">{editingId ? "Save changes" : "Add to calendar"}</button>{editingId && <button type="button" className="secondary-button" onClick={() => { setEditingId(null); setName(""); }}>Cancel editing</button>}</form></section>
+        <section className="panel"><p className="eyebrow">Selected date</p><h2>{fromDate(selectedDate).toLocaleString({ weekday: "long", month: "long", day: "numeric" })}</h2>{selectedEntries.length ? <ul className="agenda-list">{selectedEntries.map(item => <li key={`${item.kind}-${item.id}`}><span className={`agenda-dot ${item.kind}`} /><div><strong>{item.name}</strong><p>{item.slot.start}–{item.slot.end} · {item.kind === "vendor" ? "Vendor" : "Event"}</p>{item.kind === "other" && <div className="agenda-actions"><button type="button" onClick={() => editOther(item)}>Edit</button><button type="button" onClick={() => removeOther(item.id)}>Cancel event</button></div>}</div></li>)}</ul> : <p className="helper">Nothing planned for this date yet.</p>}</section>
+        <section className="panel"><h2>{editingId ? "Edit event" : "Add an event"}</h2><form className="calendar-form" onSubmit={saveOther}><label>Event name<input value={name} maxLength={120} onChange={event => setName(event.target.value)} placeholder="A very good party" /></label><label>Date<input type="date" value={selectedDate} onChange={event => { if (!event.target.value) return; setSelectedDate(event.target.value); setMonth(fromDate(event.target.value).startOf("month")); }} /></label><div className="calendar-time-fields"><label>Start (24h)<input value={start} maxLength={5} placeholder="17:00" onChange={event => setStart(event.target.value)} /></label><label>End (24h)<input value={end} maxLength={5} placeholder="19:00" onChange={event => setEnd(event.target.value)} /></label></div>{error && <p className="alert" role="alert">{error}</p>}<button className="primary-button">{editingId ? "Save changes" : "Add to calendar"}</button>{editingId && <button type="button" className="secondary-button" onClick={() => { setEditingId(null); setName(""); }}>Cancel editing</button>}</form></section>
         <section className="panel"><h2>{plan.eventDate ? "Your main event" : "Start your main event"}</h2><form className="calendar-form" onSubmit={savePrimary}><label>Event name<input value={primaryName} maxLength={120} onChange={event => setPrimaryName(event.target.value)} /></label><p className="helper">Choose its date above: {selectedDate}</p><div className="calendar-time-fields"><label>Starts<input value={primaryStart} maxLength={5} onChange={event => setPrimaryStart(event.target.value)} /></label><label>Ends<input value={primaryEnd} maxLength={5} onChange={event => setPrimaryEnd(event.target.value)} /></label></div>{primaryError && <p className="alert" role="alert">{primaryError}</p>}<button className="secondary-button">{plan.eventDate ? "Update main event" : "Create main event"}</button>{plan.eventDate && <button type="button" className="text-danger" onClick={removePrimary}>Cancel main event</button>}</form></section>
       </aside>
     </div>
+    <section className="panel run-sheet"><div className="panel-header"><div><p className="eyebrow">Everything in time order</p><h2>Event run sheet</h2></div><Link href="/conflicts">Check timing →</Link></div>{runSheet.length ? <ol className="run-sheet-list">{runSheet.map(item => <li key={`${item.kind}-${item.id}`}><time dateTime={`${item.slot.date}T${item.slot.start}`}>{item.slot.date}<strong>{item.slot.start}–{item.slot.end}</strong></time><div><strong>{item.name}</strong><p>{item.kind === "event" ? "Main event" : "Vendor setup or service"}</p></div></li>)}</ol> : <p className="empty-state">Add an event and vendor times to build your run sheet.</p>}</section>
   </main>;
 }

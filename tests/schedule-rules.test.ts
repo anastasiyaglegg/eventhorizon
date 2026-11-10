@@ -42,11 +42,21 @@ test("vendors who start after the event begins are flagged", () => {
     assert.deepEqual(check(vendor(kind, "18:30", "20:00")).map(i => i.code), ["needs_early_setup"]);
   }
   for (const kind of ["florist", "decorator"]) {
-    assert.deepEqual(check(vendor(kind, "18:30", "20:00")).map(i => i.code), ["late_arrival"]);
-    assert.deepEqual(check(vendor(kind, "18:00", "20:00")), []);
+    assert.deepEqual(check(vendor(kind, "18:30", "20:00")).map(i => i.code), ["setup_into_event", "late_arrival"]);
+    assert.deepEqual(check(vendor(kind, "18:00", "20:00")).map(i => i.code), ["setup_into_event"]);
   }
   // Caterers and bakers report it through their own arrival window, not twice.
   assert.deepEqual(check(vendor("catering", "18:30", "21:00")).map(i => i.code), ["catering_arrival"]);
+});
+test("early departures and setup during the event ask for confirmation", () => {
+  for (const kind of ["av", "photography", "entertainment"]) {
+    assert.deepEqual(check(vendor(kind, "09:00", "10:00")).map(i => i.code), ["ends_before_event"]);
+    assert.deepEqual(check(vendor(kind, "09:00", "10:00", "2026-11-13")).map(i => i.code), ["ends_before_event"]);
+    assert.deepEqual(check(vendor(kind, "17:00", "18:00")).map(i => i.code), ["ends_before_event"]);
+  }
+  for (const kind of ["florist", "decorator"]) {
+    assert.deepEqual(check(vendor(kind, "17:00", "19:00")).map(i => i.code), ["setup_into_event"]);
+  }
 });
 test("no issues skips both agents and invalid or injected actions fail closed", async () => {
   const clean = { version: "schedule-review.v1", event, vendors: [vendor("av", "17:00", "20:00")] };

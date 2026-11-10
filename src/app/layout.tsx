@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { EventPlanProvider } from "../client/event-plan";
+import { PlanActions } from "../client/plan-actions";
 import "./globals.css";
 
 export const metadata = { title: "Event Horizon" };
@@ -14,6 +15,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <Link href="/conflicts">Potential conflicts</Link>
         <Link href="/review">Arrival review</Link>
       </div>
+      <PlanActions />
     </nav>
     {children}
   </EventPlanProvider></body></html>;

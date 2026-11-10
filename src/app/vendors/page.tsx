@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { evaluateSchedule, scheduleReviewResponseSchema, type ScheduleIssue, type ScheduleReviewResponse } from "../../lib/schedule-rules";
-import { findScheduleOverlaps, validSchedule } from "../../lib/schedule-conflicts";
+import { findScheduleOverlaps, overlapsForOtherEvent, validSchedule } from "../../lib/schedule-conflicts";
 import { capacityLabel, samplePrice, searchVendors, searchVendorNames, type VendorCriteria, type Vendor } from "../../lib/vendor-search";
 import { serviceLabels, useEventPlan, type Service } from "../../client/event-plan";
+import { budgetSummary, money } from "../../lib/budget";
 
 const example = "Find a caterer in Brooklyn for 80 guests under $3,000";
 const categoryIcons: Record<string, string> = {
@@ -13,13 +14,21 @@ const categoryIcons: Record<string, string> = {
 };
 
 type VendorSlot = { date: string; start: string; end: string };
+type EventPlanStatus = "considering" | "contacted" | "confirmed";
 
 type Turn = { query: string; message: string; matches: Vendor[]; possibleMatches: Vendor[] };
 
 export default function VendorFinder() {
   const { plan, setField, vendors, directorySource, directoryWarning, directoryError } = useEventPlan();
-  const { selections, vendorSlots, otherEvents, eventDate, eventStart, eventEnd, eventGuests } = plan;
+  const { selections, vendorSlots, vendorStatuses, vendorEstimates, budgetLimit, otherEvents, eventDate, eventStart, eventEnd, eventGuests } = plan;
   const setSelections = setField("selections"), setVendorSlots = setField("vendorSlots"), setOtherEvents = setField("otherEvents");
+  const setVendorStatuses = setField("vendorStatuses"), setVendorEstimates = setField("vendorEstimates"), setBudgetLimit = setField("budgetLimit");
+  const budget = budgetSummary(plan);
+  const plannedVendorEvents = (Object.entries(selections) as [Service, string | undefined][]).flatMap(([service, id]) => {
+    if (service === "venue" || !id || !vendorSlots[id]) return [];
+    const vendor = vendors.find(item => item.id === id);
+    return vendor ? [{ id, name: vendor.name, slot: vendorSlots[id] }] : [];
+  });
   const setEventDate = setField("eventDate"), setEventStart = setField("eventStart"), setEventEnd = setField("eventEnd"), setEventGuests = setField("eventGuests");
   const [query, setQuery] = useState("");
   const [nameQuery, setNameQuery] = useState("");
@@ -43,6 +52,8 @@ export default function VendorFinder() {
   function removeVendor(service: Service, id: string) {
     clearCheck(); setSelections(current => ({ ...current, [service]: undefined }));
     setVendorSlots(current => { const updated = { ...current }; delete updated[id]; return updated; });
+    setVendorStatuses(current => { const updated = { ...current }; delete updated[id]; return updated; });
+    setVendorEstimates(current => { const updated = { ...current }; delete updated[id]; return updated; });
   }
   const [checkBusy, setCheckBusy] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
@@ -73,7 +84,7 @@ export default function VendorFinder() {
       const payload: unknown = await response.json();
       if (!response.ok) { const err = payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string" ? payload.error : "Agent review could not finish."; throw new Error(err); }
       const parsed = scheduleReviewResponseSchema.safeParse(payload);
-      if (!parsed.success) throw new Error("The agent report had an invalid format.");
+      if (!parsed.success) throw new Error("The schedule suggestions could not be read. Please try again.");
       if (sequence === checkSequence.current) { setRuleIssues(parsed.data.issues); setCheckReport(parsed.data); }
     } catch (error) {
       if (!controller.signal.aborted && sequence === checkSequence.current) setCheckError(error instanceof Error ? error.message : "The agent check could not finish.");
@@ -128,13 +139,13 @@ export default function VendorFinder() {
           <p className="eyebrow">Event Horizon</p>
           <h1>Search &amp; add vendors</h1>
           <p className="subtitle">Find caterers, bakeries, florists, venues, AV providers, photographers, decorators, and entertainment.</p>
-          <p className="scope-note"><strong>Stretch feature</strong> · Separate from the core P0 demo. Recovery Engine is the first stretch priority.</p>
+          <p className="scope-note">Explore options here, then contact each business to confirm a reservation.</p>
         </div>
-        <span className="status-pill">{directorySource === "supabase" ? "Supabase directory" : "Sample directory"}</span>
+        <span className="status-pill">{directorySource === "supabase" ? "Real vendor listings" : "Example vendor listings"}</span>
       </header>
       <section className="panel planned-summary" aria-labelledby="planned-title">
         <h2 id="planned-title">Your event plan</h2>
-        <p className="helper">Your selections are kept for this browser session. They are planning choices; contact each vendor to confirm a reservation.</p>
+        <p className="helper">Your choices are saved on this device. Mark a vendor confirmed only after they have agreed to the booking.</p>
         <div className="booking-fields"><label className="field">Event date <input type="date" value={eventDate} onChange={e => { clearCheck(); setEventDate(e.target.value); }} /></label><label className="field">Event start (24-hour HH:MM) <input value={eventStart} placeholder="18:00" maxLength={5} onChange={e => { clearCheck(); setEventStart(e.target.value); }} /></label><label className="field">Event end (24-hour HH:MM) <input value={eventEnd} placeholder="20:00" maxLength={5} onChange={e => { clearCheck(); setEventEnd(e.target.value); }} /></label><label className="field">Planned number of guests <input type="number" min="1" step="1" value={eventGuests} onChange={e => setEventGuests(e.target.value)} /></label></div>
         {!selections.venue && <p className="booking-missing">Venue not selected</p>}
         <ul className="planned-list">{(Object.entries(serviceLabels) as [Service, string][]).map(([service, label]) => {
@@ -145,8 +156,9 @@ export default function VendorFinder() {
           const overlaps = slot ? findScheduleOverlaps({ id: vendor.id, name: vendor.name, slot }, otherEvents) : [];
           const venueSlot = selections.venue ? vendorSlots[selections.venue] : undefined;
           const outsideVenue = service !== "venue" && !!slot && !!venueSlot && validSchedule(slot) && validSchedule(venueSlot) && (slot.date === venueSlot.date && (slot.start < venueSlot.start || slot.end > venueSlot.end));
-          return <li className="planned-item" key={service}><div><strong>{label}: {vendor.name}</strong><p>{scheduled && slot ? `${slot.date} · ${slot.start}–${slot.end}` : <span className="booking-missing">Date and time not set</span>}{service === "venue" && (eventGuests ? ` · ${eventGuests} planned guests` : <span className="booking-missing"> · Guest count not set</span>)}</p>{overlaps.length > 0 && <p className="helper">Also overlaps {overlaps.map(item => item.name).join(", ")}; check whether they share space or staff.</p>}{outsideVenue && <p className="booking-conflict">Outside the venue access hours.</p>}{service !== "venue" && slot && venueSlot && validSchedule(slot) && validSchedule(venueSlot) && slot.date !== venueSlot.date && <p className="helper">Confirm venue access for this separate date.</p>}</div><div className="decision-row"><button type="button" className="secondary-button" onClick={() => openSlot("vendor", vendor.id, vendor.name, slot)}>Change date and time</button><button type="button" className="secondary-button" onClick={() => removeVendor(service, vendor.id)}>Remove</button></div></li>;
+          return <li className="planned-item" key={service}><div><strong>{label}: {vendor.name}</strong><p>{scheduled && slot ? `${slot.date} · ${slot.start}–${slot.end}` : <span className="booking-missing">Date and time not set</span>}{service === "venue" && (eventGuests ? ` · ${eventGuests} planned guests` : <span className="booking-missing"> · Guest count not set</span>)}</p>{overlaps.length > 0 && <p className="helper">Also overlaps {overlaps.map(item => item.name).join(", ")}; check whether they share space or staff.</p>}{outsideVenue && <p className="booking-conflict">Outside the venue access hours.</p>}{service !== "venue" && slot && venueSlot && validSchedule(slot) && validSchedule(venueSlot) && slot.date !== venueSlot.date && <p className="helper">Confirm venue access for this separate date.</p>}</div><div className="vendor-progress"><label>Status<select aria-label={`${vendor.name} status`} value={vendorStatuses[vendor.id] ?? "considering"} onChange={event => setVendorStatuses(current => ({ ...current, [vendor.id]: event.target.value as EventPlanStatus }))}><option value="considering">Considering</option><option value="contacted">Contacted</option><option value="confirmed">Confirmed by vendor</option></select></label><label>Estimated cost ($)<input aria-label={`${vendor.name} estimated cost`} inputMode="decimal" placeholder="Unknown" value={vendorEstimates[vendor.id] ?? ""} onChange={event => { if (/^$|^\d{1,8}(?:\.\d{0,2})?$/.test(event.target.value)) setVendorEstimates(current => ({ ...current, [vendor.id]: event.target.value })); }} /></label></div><div className="decision-row"><button type="button" className="secondary-button" onClick={() => openSlot("vendor", vendor.id, vendor.name, slot)}>Change date and time</button><button type="button" className="secondary-button" onClick={() => removeVendor(service, vendor.id)}>Remove</button></div></li>;
         })}</ul>
+        <section className="budget-snapshot" aria-label="Budget snapshot"><div><h3>Budget snapshot</h3><p className="helper">Estimates you enter here are for planning; unknown prices stay unknown.</p></div><label>Total budget ($)<input inputMode="decimal" placeholder="Set a budget" value={budgetLimit} onChange={event => { if (/^$|^\d{1,9}(?:\.\d{0,2})?$/.test(event.target.value)) setBudgetLimit(event.target.value); }} /></label><div className="budget-numbers"><div><span>Known estimates</span><strong>{money(budget.estimatedCents)}</strong></div><div><span>{budget.remainingCents !== null && budget.remainingCents < 0 ? "Over budget" : "Remaining"}</span><strong>{budget.remainingCents === null ? "Set a budget" : money(Math.abs(budget.remainingCents))}</strong></div><div><span>Prices to confirm</span><strong>{budget.unknownCount}</strong></div></div></section>
       </section>
       <section className="panel" aria-labelledby="search-heading">
         <h2 id="search-heading">What do you need for your event?</h2>
@@ -155,7 +167,7 @@ export default function VendorFinder() {
           : "Sample vendors, contacts, prices, ratings, and reviews are fictional. Availability is unknown."}</p>
         {directoryError && <p className="alert" role="alert">{directoryError}</p>}
         {directoryWarning && <p className="alert" role="status">{directoryWarning}</p>}
-        {directorySource === "supabase" && vendors.length === 0 && <p className="empty-state">No valid vendor listings are available yet. Add or correct records in Supabase.</p>}
+        {directorySource === "supabase" && vendors.length === 0 && <p className="empty-state">No vendor listings are available yet.</p>}
         <h3>Browse by category</h3>
         <div className="vendor-categories" aria-label="Vendor categories">{(Object.entries(serviceLabels) as [Service, string][]).map(([service, label]) => <button className="secondary-button" type="button" key={service} onClick={() => browseCategory(service)}><span aria-hidden="true">{categoryIcons[service]}</span> {label}</button>)}</div>
         <form className="vendor-name-search" onSubmit={searchByName} aria-label="Find a vendor by name">
@@ -164,7 +176,7 @@ export default function VendorFinder() {
           </label>
           <button className="primary-button" disabled={nameQuery.trim().length < 2}>Search by name</button>
         </form>
-        <button className="secondary-button" type="button" onClick={() => openPlanner()}>View booking plan</button>
+        <button className="secondary-button" type="button" onClick={() => openPlanner()}>View vendor plan</button>
         <button className="secondary-button vendor-example" type="button" onClick={() => search(example)}>
           {example}
         </button>
@@ -212,8 +224,8 @@ export default function VendorFinder() {
         </form>
       </section>
       <dialog ref={dialogRef} className="booking-dialog" aria-labelledby="booking-title" onClose={clearCheck}>
-        <div className="booking-heading"><h2 id="booking-title">Event booking plan</h2><button type="button" className="secondary-button" onClick={() => dialogRef.current?.close()}>Close</button></div>
-        <p className="helper">Plan selections for this session. These are not confirmed bookings; contact each business to reserve.</p>
+        <div className="booking-heading"><h2 id="booking-title">Your vendor plan</h2><button type="button" className="secondary-button" onClick={() => dialogRef.current?.close()}>Close</button></div>
+        <p className="helper">These are planning choices. Contact each business to confirm a reservation.</p>
         <p>Venue: {vendors.find(v => v.id === selections.venue)?.name ?? <span className="booking-missing">Missing venue</span>}</p>
         <ul className="booking-list">{(Object.entries(serviceLabels) as [Service, string][]).map(([service, label]) => {
           const selected = vendors.find(v => v.id === selections[service]);
@@ -237,16 +249,16 @@ export default function VendorFinder() {
             </> : <span className="booking-missing">Missing {label.toLowerCase()}</span>}
           </li>;
         })}</ul>
-        <section aria-labelledby="other-events-title"><h3 id="other-events-title">Other events to check</h3><p className="helper">Add other events here to check overlaps. Only events entered in this session can be checked.</p>
+        <section aria-labelledby="other-events-title"><h3 id="other-events-title">Other events to check</h3><p className="helper">Add other events here to see where times overlap.</p>
           <button type="button" className="secondary-button" onClick={() => openSlot("event", crypto.randomUUID(), "")}>Add another event</button>
-          {otherEvents.map(event => <div key={event.id} className="booking-row"><p>{event.name}: {event.slot.date} · {event.slot.start}–{event.slot.end}</p>{findScheduleOverlaps(event, otherEvents).length > 0 && <p className="helper" role="status">Shares a time with {findScheduleOverlaps(event, otherEvents).map(item => item.name).join(", ")}. Check for shared space or staff.</p>}<div className="decision-row"><button type="button" className="secondary-button" onClick={() => openSlot("event", event.id, event.name, event.slot)}>Change event</button><button type="button" className="secondary-button" onClick={() => { clearCheck(); setOtherEvents(current => current.filter(item => item.id !== event.id)); }}>Remove event</button></div></div>)}
+          {otherEvents.map(event => { const overlaps = overlapsForOtherEvent(event, otherEvents, plannedVendorEvents); return <div key={event.id} className="booking-row"><p>{event.name}: {event.slot.date} · {event.slot.start}–{event.slot.end}</p>{overlaps.length > 0 && <p className="helper" role="status">Shares a time with {overlaps.map(item => item.name).join(", ")}. Check for shared space or staff.</p>}<div className="decision-row"><button type="button" className="secondary-button" onClick={() => openSlot("event", event.id, event.name, event.slot)}>Change event</button><button type="button" className="secondary-button" onClick={() => { clearCheck(); setOtherEvents(current => current.filter(item => item.id !== event.id)); }}>Remove event</button></div></div>; })}
         </section>
         <section aria-labelledby="agent-check-title">
           <h3 id="agent-check-title">Check vendor schedules</h3>
-          <p className="helper">Planning checks the event times and every selected vendor against your timing rules. Recovery suggests next steps for any issues. Florists and decorators may work together up to two days early. Other vendors may overlap and must start at least one hour before the event. Times use New York time; each slot must start and end on the same day.</p>
-          <button type="button" className="secondary-button" disabled={checkBusy} onClick={checkVendor}>{checkBusy ? "Agents checking…" : "Check schedules with agents"}</button>
+          <p className="helper">Check all vendor times against your event. Florists and decorators may work together up to two days early. Other vendors may overlap and must start at least one hour before. Times use New York time; each booking starts and ends on the same day.</p>
+          <button type="button" className="secondary-button" disabled={checkBusy} onClick={checkVendor}>{checkBusy ? "Checking schedules…" : "Check schedules"}</button>
           {checkError && <p className="booking-missing" role="alert">{checkError}</p>}
-          {ruleIssues && <div role="status"><h4>Schedule findings</h4>{ruleIssues.length ? <ul>{ruleIssues.map(issue => <li key={issue.id} className="booking-missing">{issue.message}{checkReport && <> <strong>({checkReport.findings.find(f => f.issue_id === issue.id)?.priority ?? "normal"} priority)</strong> {checkReport.suggestions.find(item => item.issue_id === issue.id)?.text}</>}</li>)}</ul> : <p>No issues found under the timing rules.</p>}{checkReport && <p className="helper">Planning reviewed the findings{checkReport.issues.length ? " and Recovery prepared suggested next steps" : ""}. Review and confirm any changes yourself.</p>}</div>}
+          {ruleIssues && <div role="status"><h4>Schedule findings</h4>{ruleIssues.length ? <ul>{ruleIssues.map(issue => <li key={issue.id} className="booking-missing">{issue.message}{checkReport && <> <strong>({checkReport.findings.find(f => f.issue_id === issue.id)?.priority ?? "normal"} priority)</strong> {checkReport.suggestions.find(item => item.issue_id === issue.id)?.text}</>}</li>)}</ul> : <p>No issues found under the timing rules.</p>}{checkReport && <p className="helper">Suggested next steps are ready. Review and confirm any changes yourself.</p>}</div>}
         </section>
       </dialog>
       <dialog ref={slotDialog} className="booking-dialog" aria-labelledby="slot-title">
