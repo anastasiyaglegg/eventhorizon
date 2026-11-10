@@ -9,14 +9,20 @@ import { formatTimeEntry } from "../../lib/time-input";
 
 const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const zone = "America/New_York";
-const fromDate = (date: string) => DateTime.fromISO(date, { zone });
-const today = () => DateTime.now().setZone(zone);
+// A fixed locale keeps month and weekday names the same on the server and in every browser.
+const fromDate = (date: string) => DateTime.fromISO(date, { zone, locale: "en-US" });
+const today = () => DateTime.now().setZone(zone).setLocale("en-US");
 
 export default function CalendarPage() {
   const { plan, setField, vendors } = useEventPlan();
-  const initial = plan.eventDate && fromDate(plan.eventDate).isValid ? fromDate(plan.eventDate) : today();
-  const [month, setMonth] = useState(() => initial.startOf("month"));
-  const [selectedDate, setSelectedDate] = useState(() => initial.toISODate() ?? "");
+  // "Today" is chosen in the browser after mount; the static page is built on another day.
+  const [month, setMonth] = useState<DateTime | null>(null);
+  const [selectedDate, setSelectedDate] = useState("");
+  useEffect(() => {
+    const current = today();
+    setMonth(previous => previous ?? current.startOf("month"));
+    setSelectedDate(previous => previous || (current.toISODate() ?? ""));
+  }, []);
   const [name, setName] = useState("");
   const [start, setStart] = useState("17:00");
   const [end, setEnd] = useState("19:00");
@@ -50,6 +56,7 @@ export default function CalendarPage() {
     return result.sort((a, b) => a.slot.date.localeCompare(b.slot.date) || a.slot.start.localeCompare(b.slot.start));
   }, [plan, vendors]);
 
+  if (!month) return <main className="page-shell workspace-page"><p className="empty-state">Loading your calendar…</p></main>;
   const gridStart = month.startOf("month").minus({ days: month.weekday % 7 });
   const days = Array.from({ length: 42 }, (_, index) => gridStart.plus({ days: index }));
   const selectedEntries = entries.filter(item => item.slot.date === selectedDate);

@@ -34,3 +34,15 @@ test("events using the one room cannot overlap each other", () => {
   assert.equal(result.findings.some(item => item.id === "event-overlap" && item.tone === "needs-action"), true);
   assert.equal(result.findings.filter(item => item.id.startsWith("other-event-overlap:")).length, 1);
 });
+
+test("a selected vendor missing from the loaded directory is still checked and is flagged", () => {
+  const draft = plan(); const missingId = "11111111-1111-1111-1111-111111111111";
+  draft.selections = { venue: "venue-one", catering: missingId };
+  draft.vendorSlots = { "venue-one": { date: "2026-11-20", start: "08:00", end: "23:00" }, [missingId]: { date: "2026-11-20", start: "17:30", end: "20:30" } };
+  const result = buildPlanningFindings(draft, sampleVendors);
+  assert.equal(result.selected.length, 1);
+  assert.equal(result.scheduleReady, true);
+  assert.equal(result.findings.some(item => item.id === "vendors-not-loaded"), true);
+  assert.equal(result.findings.some(item => item.id === `${missingId}:catering_arrival`), true);
+  assert.equal(result.findings.some(item => item.id === `${missingId}:catering_finish`), true);
+});

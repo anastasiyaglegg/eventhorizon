@@ -45,9 +45,38 @@ const safeSlot = (value: unknown): value is ScheduleSlot => {
   return typeof slot.date === "string" && typeof slot.start === "string" && typeof slot.end === "string";
 };
 
+const draftKeyFor = (sharedId: string) => `${storageKey}:shared:${sharedId}`;
+
+/** Rebuild a stored draft field by field so damaged or outdated values cannot break the plan. */
+function sanitizeDraft(value: unknown): EventPlan | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const item = value as Partial<EventPlan>;
+  return {
+    ...emptyPlan,
+    name: typeof item.name === "string" ? item.name.slice(0, 120) : emptyPlan.name,
+    themeId: typeof item.themeId === "string" ? item.themeId : "",
+    selections: item.selections && typeof item.selections === "object" && !Array.isArray(item.selections)
+      ? Object.fromEntries(Object.entries(item.selections).filter(([key, id]) => key in serviceLabels && typeof id === "string" && id.length <= 80)) : {},
+    vendorSlots: item.vendorSlots && typeof item.vendorSlots === "object" && !Array.isArray(item.vendorSlots)
+      ? Object.fromEntries(Object.entries(item.vendorSlots).filter(([id, slot]) => id.length <= 80 && safeSlot(slot))) : {},
+    vendorStatuses: item.vendorStatuses && typeof item.vendorStatuses === "object" && !Array.isArray(item.vendorStatuses)
+      ? Object.fromEntries(Object.entries(item.vendorStatuses).filter(([id, status]) => id.length <= 80 && ["considering", "contacted", "confirmed"].includes(String(status)))) as EventPlan["vendorStatuses"] : {},
+    vendorEstimates: item.vendorEstimates && typeof item.vendorEstimates === "object" && !Array.isArray(item.vendorEstimates)
+      ? Object.fromEntries(Object.entries(item.vendorEstimates).filter(([id, estimate]) => id.length <= 80 && typeof estimate === "string" && /^$|^\d{1,8}(?:\.\d{1,2})?$/.test(estimate))) : {},
+    budgetLimit: typeof item.budgetLimit === "string" && /^$|^\d{1,9}(?:\.\d{1,2})?$/.test(item.budgetLimit) ? item.budgetLimit : "",
+    otherEvents: Array.isArray(item.otherEvents) ? item.otherEvents.filter((entry): entry is NamedSchedule =>
+      !!entry && typeof entry === "object" && typeof entry.id === "string" && typeof entry.name === "string" && safeSlot(entry.slot)).slice(0, 100) : [],
+    eventDate: typeof item.eventDate === "string" ? item.eventDate : "",
+    eventStart: typeof item.eventStart === "string" ? item.eventStart : "",
+    eventEnd: typeof item.eventEnd === "string" ? item.eventEnd : "",
+    eventGuests: typeof item.eventGuests === "string" ? item.eventGuests : "",
+  };
+}
+
 export function EventPlanProvider({ children }: { children: ReactNode }) {
   const [plan, setPlan] = useState<EventPlan>(emptyPlan);
   const [hydrated, setHydrated] = useState(false);
+  const [draftKey, setDraftKey] = useState<string | null>(null);
   const [shared, setShared] = useState<SharedPlan | null>(null);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [sharedLoadError, setSharedLoadError] = useState<string | null>(null);
@@ -58,38 +87,6 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
   const editedDuringLoad = useRef(false);
 
   useEffect(() => {
-    try {
-      const legacy = sessionStorage.getItem(oldStorageKey);
-      const saved = legacy ?? localStorage.getItem(storageKey);
-      if (legacy) sessionStorage.removeItem(oldStorageKey);
-      if (saved) {
-        const value: unknown = JSON.parse(saved);
-        if (value && typeof value === "object" && !Array.isArray(value)) {
-          const item = value as Partial<EventPlan>;
-          setPlan({
-            ...emptyPlan,
-            name: typeof item.name === "string" ? item.name.slice(0, 120) : emptyPlan.name,
-            themeId: typeof item.themeId === "string" ? item.themeId : "",
-            selections: item.selections && typeof item.selections === "object" && !Array.isArray(item.selections)
-              ? Object.fromEntries(Object.entries(item.selections).filter(([key, id]) => key in serviceLabels && typeof id === "string" && id.length <= 80)) : {},
-            vendorSlots: item.vendorSlots && typeof item.vendorSlots === "object" && !Array.isArray(item.vendorSlots)
-              ? Object.fromEntries(Object.entries(item.vendorSlots).filter(([id, slot]) => id.length <= 80 && safeSlot(slot))) : {},
-            vendorStatuses: item.vendorStatuses && typeof item.vendorStatuses === "object" && !Array.isArray(item.vendorStatuses)
-              ? Object.fromEntries(Object.entries(item.vendorStatuses).filter(([id, status]) => id.length <= 80 && ["considering", "contacted", "confirmed"].includes(String(status)))) as EventPlan["vendorStatuses"] : {},
-            vendorEstimates: item.vendorEstimates && typeof item.vendorEstimates === "object" && !Array.isArray(item.vendorEstimates)
-              ? Object.fromEntries(Object.entries(item.vendorEstimates).filter(([id, estimate]) => id.length <= 80 && typeof estimate === "string" && /^$|^\d{1,8}(?:\.\d{1,2})?$/.test(estimate))) : {},
-            budgetLimit: typeof item.budgetLimit === "string" && /^$|^\d{1,9}(?:\.\d{1,2})?$/.test(item.budgetLimit) ? item.budgetLimit : "",
-            otherEvents: Array.isArray(item.otherEvents) ? item.otherEvents.filter((entry): entry is NamedSchedule =>
-              !!entry && typeof entry === "object" && typeof entry.id === "string" && typeof entry.name === "string" && safeSlot(entry.slot)).slice(0, 100) : [],
-            eventDate: typeof item.eventDate === "string" ? item.eventDate : "",
-            eventStart: typeof item.eventStart === "string" ? item.eventStart : "",
-            eventEnd: typeof item.eventEnd === "string" ? item.eventEnd : "",
-            eventGuests: typeof item.eventGuests === "string" ? item.eventGuests : "",
-          });
-        }
-      }
-    } catch { /* A damaged browser draft starts fresh. */ }
-    setHydrated(true);
     const params = new URLSearchParams(location.search);
     const hash = new URLSearchParams(location.hash.slice(1));
     let id = params.get("plan"); let token = hash.get("key");
@@ -101,32 +98,54 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
         }
       } catch { /* An invalid remembered link is ignored. */ }
     }
-    if (id && token) {
-      fetch("/api/plans", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, token }) })
+    const sharedLink = id && token ? { id, token } : null;
+    let dirty: { id?: string; version?: number } | null = null;
+    try { dirty = JSON.parse(sessionStorage.getItem(dirtySharedKey) ?? "null") as { id?: string; version?: number } | null; } catch { /* Ignore a damaged marker. */ }
+
+    // Each shared plan keeps its own draft, separate from the unshared local draft, so opening a link
+    // or working in another tab can never overwrite a different plan.
+    const key = sharedLink ? draftKeyFor(sharedLink.id) : storageKey;
+    let draft: EventPlan | null = null;
+    try {
+      const legacy = sharedLink ? null : sessionStorage.getItem(oldStorageKey);
+      if (legacy) sessionStorage.removeItem(oldStorageKey);
+      // Only an unsaved shared draft is worth restoring; otherwise the server copy is loaded below.
+      const saved = legacy ?? (sharedLink && dirty?.id !== sharedLink.id ? null : localStorage.getItem(key));
+      if (saved) draft = sanitizeDraft(JSON.parse(saved) as unknown);
+    } catch { /* A damaged browser draft starts fresh. */ }
+
+    if (!sharedLink && hash.has("copy")) {
+      try {
+        const parsed = eventPlanSchema.safeParse(JSON.parse(decodeURIComponent(hash.get("copy") ?? "")) as unknown);
+        const hasOwnWork = !!draft && JSON.stringify(draft) !== JSON.stringify(emptyPlan) && JSON.stringify(draft) !== JSON.stringify(parsed.data);
+        if (parsed.success && (!hasOwnWork || window.confirm("Open the copied plan? It will replace the plan saved on this device."))) draft = parsed.data;
+      } catch { /* Invalid copied links leave the local plan intact. */ }
+      // Drop the copy from the address bar so a reload does not wipe later edits.
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+    if (draft) setPlan(draft);
+    setDraftKey(key);
+    setHydrated(true);
+
+    if (sharedLink) {
+      fetch("/api/plans", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sharedLink) })
         .then(async response => {
           const data = await response.json() as { plan?: unknown; version?: number; error?: string };
           if (!response.ok) throw new Error(data.error ?? "Could not open the shared plan.");
           const parsed = eventPlanSchema.safeParse(data.plan);
           if (!parsed.success || !data.version) throw new Error("The shared plan could not be read.");
-          let dirty: { id?: string; version?: number } | null = null;
-          try { dirty = JSON.parse(sessionStorage.getItem(dirtySharedKey) ?? "null") as { id?: string; version?: number } | null; } catch { /* Ignore a damaged marker. */ }
-          const preserveDraft = editedDuringLoad.current || dirty?.id === id;
-          const version = dirty?.id === id && Number.isInteger(dirty.version) ? dirty.version! : data.version;
+          const preserveDraft = editedDuringLoad.current || (dirty?.id === sharedLink.id && !!draft);
+          const version = preserveDraft && dirty?.id === sharedLink.id && Number.isInteger(dirty.version) ? dirty.version! : data.version;
           if (!preserveDraft) setPlan(parsed.data);
-          setShared({ id, token, version }); setUnsavedChanges(preserveDraft); setSharedLoadError(null);
-          if (preserveDraft) sessionStorage.setItem(dirtySharedKey, JSON.stringify({ id, version }));
-          sessionStorage.setItem(sharedStorageKey, JSON.stringify({ id, token, version }));
+          setShared({ ...sharedLink, version }); setUnsavedChanges(preserveDraft); setSharedLoadError(null);
+          if (preserveDraft) sessionStorage.setItem(dirtySharedKey, JSON.stringify({ id: sharedLink.id, version }));
+          else sessionStorage.removeItem(dirtySharedKey);
+          sessionStorage.setItem(sharedStorageKey, JSON.stringify({ ...sharedLink, version }));
         }).catch(error => setSharedLoadError(error instanceof Error ? error.message : "Could not open the shared plan."));
-    } else if (hash.has("copy")) {
-      try {
-        const decoded = JSON.parse(decodeURIComponent(hash.get("copy") ?? "")) as unknown;
-        const parsed = eventPlanSchema.safeParse(decoded);
-        if (parsed.success) setPlan(parsed.data);
-      } catch { /* Invalid copied links leave the local plan intact. */ }
     }
   }, []);
 
-  useEffect(() => { if (hydrated) { try { localStorage.setItem(storageKey, JSON.stringify(plan)); } catch { /* Browser storage may be unavailable. */ } } }, [plan, hydrated]);
+  useEffect(() => { if (hydrated && draftKey) { try { localStorage.setItem(draftKey, JSON.stringify(plan)); } catch { /* Browser storage may be unavailable. */ } } }, [plan, hydrated, draftKey]);
   useEffect(() => {
     let active = true;
     fetch("/api/vendors")
@@ -175,7 +194,7 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
       if (!data.id || !data.token || !data.version) throw new Error("Could not save the plan.");
       const next = { id: data.id, token: data.token, version: data.version };
       const url = `${location.origin}${location.pathname}?plan=${next.id}#key=${next.token}`;
-      history.replaceState(null, "", url); setShared(next); setUnsavedChanges(false); sessionStorage.removeItem(dirtySharedKey);
+      history.replaceState(null, "", url); setShared(next); setDraftKey(draftKeyFor(next.id)); setUnsavedChanges(false); sessionStorage.removeItem(dirtySharedKey);
       sessionStorage.setItem(sharedStorageKey, JSON.stringify(next));
       return { link: url, live: true };
     } catch (error) {
@@ -186,7 +205,7 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <PlanContext.Provider value={{ plan, setField, resetPlan: () => { setPlan(emptyPlan); setShared(null); setUnsavedChanges(false); sessionStorage.removeItem(sharedStorageKey); sessionStorage.removeItem(dirtySharedKey); history.replaceState(null, "", location.pathname); }, shared: !!shared, unsavedChanges, sharedLoadError, saveAndShare, refreshShared, vendors, directorySource, directoryWarning, directoryError }}>{children}</PlanContext.Provider>;
+  return <PlanContext.Provider value={{ plan, setField, resetPlan: () => { setPlan(emptyPlan); setShared(null); setDraftKey(storageKey); setUnsavedChanges(false); sessionStorage.removeItem(sharedStorageKey); sessionStorage.removeItem(dirtySharedKey); history.replaceState(null, "", location.pathname); }, shared: !!shared, unsavedChanges, sharedLoadError, saveAndShare, refreshShared, vendors, directorySource, directoryWarning, directoryError }}>{children}</PlanContext.Provider>;
 }
 
 export function useEventPlan() {

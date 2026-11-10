@@ -9,6 +9,7 @@ import { serviceLabels, useEventPlan, type Service } from "../../client/event-pl
 import { budgetSummary, money } from "../../lib/budget";
 import { themeName } from "../../lib/event-themes";
 import { formatTimeEntry } from "../../lib/time-input";
+import { selectedVendorSchedules } from "../../lib/planning-findings";
 
 const example = "Find a caterer in Brooklyn for 80 guests under $3,000";
 const categoryIcons: Record<string, string> = {
@@ -32,11 +33,7 @@ export default function VendorFinder() {
   const setSelections = setField("selections"), setVendorSlots = setField("vendorSlots"), setOtherEvents = setField("otherEvents");
   const setVendorStatuses = setField("vendorStatuses"), setVendorEstimates = setField("vendorEstimates"), setBudgetLimit = setField("budgetLimit");
   const budget = budgetSummary(plan);
-  const plannedVendorEvents = (Object.entries(selections) as [Service, string | undefined][]).flatMap(([service, id]) => {
-    if (service === "venue" || !id || !vendorSlots[id]) return [];
-    const vendor = vendors.find(item => item.id === id);
-    return vendor ? [{ id, name: vendor.name, slot: vendorSlots[id] }] : [];
-  });
+  const plannedVendorEvents = selectedVendorSchedules(plan, vendors).flatMap(item => item.slot ? [{ id: item.id, name: item.name, slot: item.slot }] : []);
   const mainSlot = { date: eventDate, start: eventStart, end: eventEnd };
   const roomOccupants = [...plannedVendorEvents, ...(validSchedule(mainSlot) ? [{ id: "main-event", name: plan.name, slot: mainSlot }] : [])];
   const setEventName = setField("name"), setEventDate = setField("eventDate"), setEventStart = setField("eventStart"), setEventEnd = setField("eventEnd"), setEventGuests = setField("eventGuests");
@@ -79,11 +76,8 @@ export default function VendorFinder() {
   useEffect(() => () => { checkAbort.current?.abort(); }, []);
   async function checkVendor() {
     clearCheck();
-    const selected = (Object.entries(selections) as [Service, string | undefined][]).filter(([service, id]) => service !== "venue" && !!id).flatMap(([service, id]) => {
-      const vendor = vendors.find(v => v.id === id);
-      // The schedule check accepts names up to 200 characters; directory names are not capped.
-      return vendor ? [{ id: vendor.id, name: vendor.name.slice(0, 200), category: service, slot: vendorSlots[vendor.id] ?? null }] : [];
-    });
+    // Vendors missing from the loaded directory are still checked under a placeholder name.
+    const selected = selectedVendorSchedules(plan, vendors).map(({ missing: _missing, ...vendor }) => vendor);
     const input = { version: "schedule-review.v1", event: { date: eventDate, start: eventStart, end: eventEnd }, vendors: selected };
     try { setRuleIssues(evaluateSchedule(input).issues); }
     catch { setCheckError("Enter a valid event date, same-day start and end time, and select at least one vendor."); return; }

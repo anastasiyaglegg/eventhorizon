@@ -6,12 +6,27 @@ import { findScheduleOverlaps, overlapsForOtherEvent, validSchedule } from "./sc
 
 export type PlanningFinding = { id: string; title: string; detail: string; tone: "needs-action" | "check" };
 
+const fallbackNames: Record<Exclude<Service, "venue">, string> = { catering: "Caterer", florist: "Florist", entertainment: "DJ / entertainment", bakery: "Bakery", av: "AV", photography: "Photographer", decorator: "Decorator" };
+
+/**
+ * Selected non-venue vendors with their recorded times. The category comes from the plan itself, so a vendor
+ * missing from the loaded directory (still loading, offline, removed, or opened from another deployment) is
+ * still checked under a placeholder name instead of being silently dropped.
+ */
+export function selectedVendorSchedules(plan: Pick<EventPlan, "selections" | "vendorSlots">, vendors: Vendor[]) {
+  return (Object.entries(plan.selections) as [Service, string | undefined][]).flatMap(([service, id]) => {
+    if (service === "venue" || !id) return [];
+    const vendor = vendors.find(item => item.id === id);
+    const name = vendor ? vendor.name.slice(0, 200) : `Selected ${fallbackNames[service].toLowerCase()} (details not loaded)`;
+    return [{ id, name, category: service, slot: plan.vendorSlots[id] ?? null, missing: !vendor }];
+  });
+}
+
 /** All events and scheduled vendor work use one event room. Concurrent vendors are allowed. */
 export function buildPlanningFindings(plan: EventPlan, vendors: Vendor[]) {
-  const selected = (Object.entries(plan.selections) as [Service, string | undefined][]).filter(([service, id]) => service !== "venue" && !!id).flatMap(([service, id]) => {
-    const vendor = vendors.find(item => item.id === id);
-    return vendor ? [{ id: vendor.id, name: vendor.name.slice(0, 200), category: service, slot: plan.vendorSlots[vendor.id] ?? null }] : [];
-  });
+  const chosen = selectedVendorSchedules(plan, vendors);
+  const missingCount = chosen.filter(item => item.missing).length;
+  const selected = chosen.map(({ missing: _missing, ...vendor }) => vendor);
   const input = { version: "schedule-review.v1", event: { date: plan.eventDate, start: plan.eventStart, end: plan.eventEnd }, vendors: selected };
   let ruleIssues: ScheduleIssue[] = [];
   let scheduleReady = false;
@@ -23,6 +38,7 @@ export function buildPlanningFindings(plan: EventPlan, vendors: Vendor[]) {
   const findings: PlanningFinding[] = ruleIssues.map(issue => ({ id: issue.id, title: issue.vendorName, detail: issue.message, tone: "needs-action" }));
   const mainSlot = { date: plan.eventDate, start: plan.eventStart, end: plan.eventEnd };
   if (!validSchedule(mainSlot) || scheduleError) findings.unshift({ id: "event-time", title: "Check event and vendor times", detail: "Choose real dates and same-day start and end times in New York time. Times during a daylight-saving change may need another choice.", tone: "needs-action" });
+  if (missingCount) findings.unshift({ id: "vendors-not-loaded", title: "Some vendor details didn't load", detail: `${missingCount === 1 ? "1 selected vendor is" : `${missingCount} selected vendors are`} not in the vendor list that loaded. Timing rules still use the recorded times. Reload the page, or choose the vendor again, before relying on names and details.`, tone: "check" });
   if (!plan.selections.venue) findings.push({ id: "venue", title: "Choose a venue", detail: "Your event needs a venue before access hours can be checked.", tone: "needs-action" });
   const venueSlot = plan.selections.venue ? plan.vendorSlots[plan.selections.venue] : undefined;
   if (plan.selections.venue && !venueSlot) findings.push({ id: "venue-hours", title: "Add venue access hours", detail: "Set a date and time for the selected venue so setup access can be reviewed.", tone: "check" });
