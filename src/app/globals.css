@@ -123,3 +123,10 @@ p { line-height: 1.55; }
 .vendor-contact { font-weight: 650; color: var(--ink); }
 .vendor-review { border-left: 3px solid var(--line); margin: 12px 0 0; padding: 4px 0 4px 12px; }
 .vendor-review p { font-size: 0.9rem; margin: 0; }
+
+.review-steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+.review-step { padding: 8px 12px; border-radius: 999px; background: #e8edf5; color: #4a5870; font-size: .85rem; font-weight: 700; }
+.review-step.current { background: #dbe9ff; color: #173f8b; }
+.event-vendor { margin: 16px 0 0; }
+.review-grid:focus { outline: none; }
+.risk-item summary { cursor: pointer; font-weight: 700; }
