@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { capacityLabel, samplePrice, sampleVendors, searchVendors, type VendorCriteria, type Vendor } from "../../lib/vendor-search";
 
@@ -9,10 +9,27 @@ const categoryIcons: Record<string, string> = {
   catering: "🍴", bakery: "🥖", venue: "🏛️", av: "🎛️", photography: "📷", florist: "🌸", decorator: "🎈", entertainment: "🎵",
 };
 
+const serviceLabels = { venue: "Venue", catering: "Caterer", florist: "Florist", entertainment: "DJ / entertainment", bakery: "Bakery", av: "AV", photography: "Photographer", decorator: "Decorator" } as const;
+type Service = keyof typeof serviceLabels;
+type Selections = Partial<Record<Service, string>>;
+
 type Turn = { query: string; message: string; matches: Vendor[]; possibleMatches: Vendor[] };
 
 export default function VendorFinder() {
   const [query, setQuery] = useState("");
+  const [selections, setSelections] = useState<Selections>({});
+  const [eventDate, setEventDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const validTime = (value: string) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+  const slotValid = validTime(startTime) && validTime(endTime) && startTime < endTime;
+  function openPlanner(vendor?: Vendor) {
+    if (vendor && Object.hasOwn(serviceLabels, vendor.service)) {
+      setSelections(current => ({ ...current, [vendor.service]: vendor.id }));
+    }
+    if (!dialogRef.current?.open) dialogRef.current?.showModal();
+  }
   const [criteria, setCriteria] = useState<VendorCriteria>({});
   const [turns, setTurns] = useState<Turn[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>(sampleVendors);
@@ -75,6 +92,7 @@ export default function VendorFinder() {
         {directoryError && <p className="alert" role="alert">{directoryError}</p>}
         {directoryWarning && <p className="alert" role="status">{directoryWarning}</p>}
         {directorySource === "supabase" && vendors.length === 0 && <p className="empty-state">No valid vendor listings are available yet. Add or correct records in Supabase.</p>}
+        <button className="secondary-button" type="button" onClick={() => openPlanner()}>View booking plan</button>
         <button className="secondary-button vendor-example" type="button" onClick={() => search(example)}>
           {example}
         </button>
@@ -96,7 +114,9 @@ export default function VendorFinder() {
                   <p>{vendor.details}</p>
                   <p className="helper">{vendor.priceMin === null && vendor.priceMax === null ? "Demo price $2,000 (fictional)" : `${vendor.isSynthetic ? "Sample price" : "Listed price"} ${samplePrice(vendor)}`} · {vendor.capacityMin === null && vendor.capacityMax === null ? "Demo capacity 100 guests (fictional)" : `Capacity ${capacityLabel(vendor)}`} · Demo availability: available (fictional)</p>
                   <p className="helper">Demo values are examples only and are not used to determine matches. Contact the vendor to confirm actual details.</p>
-                  {(vendor.contactEmail || vendor.sourceUrl) && <p className="helper">{vendor.isSynthetic ? "Sample contact" : "Contact"} {vendor.contactEmail && <span className="vendor-contact">{vendor.contactEmail}</span>}{vendor.contactEmail && vendor.sourceUrl && " · "}{vendor.sourceUrl && <a href={vendor.sourceUrl} target="_blank" rel="noreferrer">Source</a>}</p>}
+                  {(vendor.contactEmail || vendor.sourceUrl) && <p className="helper">{vendor.isSynthetic ? "Sample contact" : "Contact"} {vendor.contactEmail && <span className="vendor-contact">{vendor.contactEmail}</span>}{vendor.contactEmail && vendor.sourceUrl && " · "}{vendor.sourceUrl && <a href={vendor.sourceUrl} target="_blank" rel="noopener noreferrer">Visit website</a>}</p>}
+                  {!vendor.sourceUrl && <p className="helper">Website not available</p>}
+                  <button className="secondary-button" type="button" onClick={() => openPlanner(vendor)}>Book {vendor.name}</button>
                   {vendor.review && <blockquote className="vendor-review">
                     <span className="fact-label">{vendor.isSynthetic ? "Sample review" : "Review summary"}</span>
                     <p>“{vendor.review}”</p>
@@ -119,6 +139,28 @@ export default function VendorFinder() {
           </div>
         </form>
       </section>
+      <dialog ref={dialogRef} className="booking-dialog" aria-labelledby="booking-title">
+        <div className="booking-heading"><h2 id="booking-title">Event booking plan</h2><button type="button" className="secondary-button" onClick={() => dialogRef.current?.close()}>Close</button></div>
+        <p className="helper">Plan selections for this session. These are not confirmed bookings; contact each business to reserve.</p>
+        <div className="booking-fields">
+          <label className="field">Event date <input type="date" value={eventDate} onChange={event => setEventDate(event.target.value)} /></label>
+          <label className="field">Start time (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="17:00" maxLength={5} value={startTime} onChange={event => setStartTime(event.target.value)} /></label>
+          <label className="field">End time (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="19:00" maxLength={5} value={endTime} onChange={event => setEndTime(event.target.value)} /></label>
+        </div>
+        {!eventDate && <p className="booking-missing">Missing: event date</p>}
+        {!slotValid && <p className="booking-missing">Missing or invalid: enter a same-day time slot in 24-hour format (end after start).</p>}
+        <p>Venue: {vendors.find(v => v.id === selections.venue)?.name ?? <span className="booking-missing">Missing venue</span>}</p>
+        <ul className="booking-list">{(Object.entries(serviceLabels) as [Service, string][]).map(([service, label]) => {
+          const selected = vendors.find(v => v.id === selections[service]);
+          return <li key={service} className="booking-row"><label>{label}
+            <select value={selections[service] ?? ""} onChange={event => setSelections(current => ({ ...current, [service]: event.target.value || undefined }))}>
+              <option value="">Choose {label.toLowerCase()}</option>
+              {vendors.filter(v => v.service === service).map(v => <option key={v.id} value={v.id}>{v.name} · {v.borough}</option>)}
+            </select></label>
+            {selected ? <span>Selected: {selected.name} {selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Visit website</a>}</span> : <span className="booking-missing">Missing {label.toLowerCase()}</span>}
+          </li>;
+        })}</ul>
+      </dialog>
     </main>
   );
 }
