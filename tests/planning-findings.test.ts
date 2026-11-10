@@ -23,5 +23,14 @@ test("an invalid calendar date is an explicit finding and blocks AI review", () 
 test("other events report their overlap with a planned vendor", () => {
   const draft = plan(); draft.otherEvents = [{ id: "staff", name: "Staff briefing", slot: { date: "2026-11-20", start: "17:30", end: "18:30" } }];
   const result = buildPlanningFindings(draft, sampleVendors);
-  assert.equal(result.findings.some(item => item.id === "other-event-vendors:staff" && item.detail.includes(provider.name)), true);
+  assert.equal(result.findings.some(item => item.id === "other-event-vendors:staff" && item.detail.includes(provider.name) && item.tone === "needs-action"), true);
+});
+test("events using the one room cannot overlap each other", () => {
+  const draft = plan(); draft.otherEvents = [
+    { id: "staff", name: "Staff briefing", slot: { date: "2026-11-20", start: "17:30", end: "18:30" } },
+    { id: "photos", name: "Photo shoot", slot: { date: "2026-11-20", start: "17:45", end: "18:15" } },
+  ];
+  const result = buildPlanningFindings(draft, sampleVendors);
+  assert.equal(result.findings.some(item => item.id === "event-overlap" && item.tone === "needs-action"), true);
+  assert.equal(result.findings.filter(item => item.id.startsWith("other-event-overlap:")).length, 1);
 });

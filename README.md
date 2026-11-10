@@ -66,7 +66,7 @@ decision. The theme is a saved mood choice; it does not change vendor matches or
 scheduling rules. The planning screens are proposed additions awaiting team and
 instructor agreement.
 
-Dates and times use New York time. Each recorded vendor or venue window starts
+Dates and times use New York time. The project assumes one event room: two events cannot overlap there, while vendors may work together. Type four time digits such as 1700 and the app shows 17:00. Each recorded vendor or venue window starts
 and ends on one date. That allows a florist to be placed two days before an
 event, but does not yet represent a setup that spans several days or venue
 access across dates. Schedule findings are prompts to confirm details, not proof

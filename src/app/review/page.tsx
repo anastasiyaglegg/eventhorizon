@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { analysisInputSchema } from "../../lib/contract";
+import { formatTimeEntry } from "../../lib/time-input";
 import { requestAnalysis } from "../../client/analysis-api";
 import { requestRecovery } from "../../client/recovery-api";
 import type { RecoveryOutput } from "../../lib/recovery-contract";
@@ -266,7 +267,7 @@ export default function Home() {
 
       <section className="panel">
         <h2>1. Enter a proposed arrival</h2>
-        <p className="helper" id="arrival-help">Enter 24-hour time in HH:MM format, such as 17:00, using the event’s local time zone. Leave blank if the arrival is unknown.</p>
+        <p className="helper" id="arrival-help">Type four digits for a 24-hour time, such as 1700 for 17:00. The colon appears automatically. Leave blank if the arrival is unknown.</p>
         <div className="arrival-form">
           <div className="field">
             <label htmlFor="proposed-arrival">Proposed arrival</label>
@@ -275,11 +276,11 @@ export default function Home() {
               type="text"
               autoComplete="off"
               inputMode="numeric"
-              placeholder="17:00"
+              placeholder="1700"
               maxLength={5}
               aria-describedby="arrival-help"
               value={arrivalInput}
-              onChange={(eventChange) => updateArrival(eventChange.target.value)}
+              onChange={(eventChange) => updateArrival(formatTimeEntry(eventChange.target.value))}
               onKeyDown={(eventKey) => { if (eventKey.key === "Enter" && !busy) { eventKey.preventDefault(); void analyzeProposal(); } }}
             />
           </div>

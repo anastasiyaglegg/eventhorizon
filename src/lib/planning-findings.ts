@@ -6,7 +6,7 @@ import { findScheduleOverlaps, overlapsForOtherEvent, validSchedule } from "./sc
 
 export type PlanningFinding = { id: string; title: string; detail: string; tone: "needs-action" | "check" };
 
-/** Deterministic warnings only. A shared time alone never proves a booking conflict. */
+/** All events and scheduled vendor work use one event room. Concurrent vendors are allowed. */
 export function buildPlanningFindings(plan: EventPlan, vendors: Vendor[]) {
   const selected = (Object.entries(plan.selections) as [Service, string | undefined][]).filter(([service, id]) => service !== "venue" && !!id).flatMap(([service, id]) => {
     const vendor = vendors.find(item => item.id === id);
@@ -37,12 +37,15 @@ export function buildPlanningFindings(plan: EventPlan, vendors: Vendor[]) {
   }
   if (validSchedule(mainSlot)) {
     const overlaps = findScheduleOverlaps({ id: "main-event", name: plan.name, slot: mainSlot }, plan.otherEvents);
-    if (overlaps.length) findings.push({ id: "event-overlap", title: "Two events share a time", detail: `${overlaps.map(item => item.name).join(", ")} overlaps this event. Check whether they share a room or staff; overlap alone is not a conflict.`, tone: "check" });
+    if (overlaps.length) findings.push({ id: "event-overlap", title: "Events overlap in the room", detail: `${overlaps.map(item => item.name).join(", ")} overlaps this event in the one event room. Change an event time or remove the overlapping event.`, tone: "needs-action" });
   }
   const vendorEvents = selected.filter((item): item is typeof item & { slot: NonNullable<typeof item.slot> } => !!item.slot && validSchedule(item.slot));
   for (const event of plan.otherEvents) {
-    const overlappingVendors = overlapsForOtherEvent(event, plan.otherEvents, vendorEvents).filter(item => vendorEvents.some(vendor => vendor.id === item.id));
-    if (overlappingVendors.length) findings.push({ id: `other-event-vendors:${event.id}`, title: `Check ${event.name} against planned vendors`, detail: `${overlappingVendors.map(item => item.name).join(", ")} shares a time with this event. Confirm whether they need the same space or staff.`, tone: "check" });
+    const overlaps = overlapsForOtherEvent(event, plan.otherEvents, vendorEvents);
+    const overlappingVendors = overlaps.filter(item => vendorEvents.some(vendor => vendor.id === item.id));
+    if (overlappingVendors.length) findings.push({ id: `other-event-vendors:${event.id}`, title: `${event.name} conflicts with vendor setup`, detail: `${overlappingVendors.map(item => item.name).join(", ")} is scheduled in the event room during this event. Change a time or remove the overlapping event.`, tone: "needs-action" });
+    const overlappingEvents = overlaps.filter(item => plan.otherEvents.some(other => other.id === item.id) && event.id < item.id);
+    if (overlappingEvents.length) findings.push({ id: `other-event-overlap:${event.id}`, title: "Events overlap in the room", detail: `${event.name} overlaps ${overlappingEvents.map(item => item.name).join(", ")} in the one event room. Change an event time or remove one of them.`, tone: "needs-action" });
   }
   return { selected, input, ruleIssues, scheduleReady, findings };
 }
