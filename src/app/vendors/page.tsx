@@ -5,6 +5,7 @@ import Link from "next/link";
 import { requestAnalysis } from "../../client/analysis-api";
 import { requestRecovery } from "../../client/recovery-api";
 import { vendorPlanToAnalysis } from "../../lib/vendor-planning";
+import { findScheduleOverlaps, validSchedule, type NamedSchedule } from "../../lib/schedule-conflicts";
 import type { ReviewPacket } from "../../lib/contract";
 import type { RecoveryOutput } from "../../lib/recovery-contract";
 import { capacityLabel, samplePrice, sampleVendors, searchVendors, type VendorCriteria, type Vendor } from "../../lib/vendor-search";
@@ -25,9 +26,27 @@ export default function VendorFinder() {
   const [query, setQuery] = useState("");
   const [selections, setSelections] = useState<Selections>({});
   const [vendorSlots, setVendorSlots] = useState<Record<string, VendorSlot>>({});
-  function updateSlot(id: string, field: keyof VendorSlot, value: string) {
+  const [otherEvents, setOtherEvents] = useState<NamedSchedule[]>([]);
+  const [editing, setEditing] = useState<{ kind: "vendor" | "event"; id: string; name: string } | null>(null);
+  const [draftSlot, setDraftSlot] = useState<VendorSlot>({ date: "", start: "", end: "" });
+  const [draftName, setDraftName] = useState("");
+  const [slotError, setSlotError] = useState<string | null>(null);
+  const slotDialog = useRef<HTMLDialogElement>(null);
+  function openSlot(kind: "vendor" | "event", id: string, name: string, slot?: VendorSlot) {
+    setEditing({ kind, id, name }); setDraftName(name); setDraftSlot(slot ?? { date: "", start: "", end: "" }); setSlotError(null);
+    slotDialog.current?.showModal();
+  }
+  function saveSlot() {
+    if (!editing) return;
+    if (!validSchedule(draftSlot) || (editing.kind === "event" && !draftName.trim())) { setSlotError("Enter a name, date, and valid same-day 24-hour start and end times."); return; }
     clearCheck();
-    setVendorSlots(current => ({ ...current, [id]: { ...(current[id] ?? { date: "", start: "", end: "" }), [field]: value } }));
+    if (editing.kind === "vendor") setVendorSlots(current => ({ ...current, [editing.id]: { ...draftSlot } }));
+    else setOtherEvents(current => [...current.filter(event => event.id !== editing.id), { id: editing.id, name: draftName.trim(), slot: { ...draftSlot } }]);
+    slotDialog.current?.close();
+  }
+  function removeVendor(service: Service, id: string) {
+    clearCheck(); setSelections(current => ({ ...current, [service]: undefined }));
+    setVendorSlots(current => { const updated = { ...current }; delete updated[id]; return updated; });
   }
   const [eventStart, setEventStart] = useState("");
   const [setupMinutes, setSetupMinutes] = useState("");
@@ -115,6 +134,11 @@ export default function VendorFinder() {
     setQuery("");
   }
 
+  function browseCategory(service: Service) {
+    const result = searchVendors(service, {}, vendors);
+    setCriteria(result.criteria); setTurns([{ query: serviceLabels[service], message: result.message, matches: result.matches, possibleMatches: result.possibleMatches }]); setQuery("");
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     search(query);
@@ -140,6 +164,8 @@ export default function VendorFinder() {
         {directoryError && <p className="alert" role="alert">{directoryError}</p>}
         {directoryWarning && <p className="alert" role="status">{directoryWarning}</p>}
         {directorySource === "supabase" && vendors.length === 0 && <p className="empty-state">No valid vendor listings are available yet. Add or correct records in Supabase.</p>}
+        <h3>Browse by category</h3>
+        <div className="vendor-categories" aria-label="Vendor categories">{(Object.entries(serviceLabels) as [Service, string][]).map(([service, label]) => <button className="secondary-button" type="button" key={service} onClick={() => browseCategory(service)}><span aria-hidden="true">{categoryIcons[service]}</span> {label}</button>)}</div>
         <button className="secondary-button" type="button" onClick={() => openPlanner()}>View booking plan</button>
         <button className="secondary-button vendor-example" type="button" onClick={() => search(example)}>
           {example}
@@ -202,16 +228,22 @@ export default function VendorFinder() {
             </select></label>
             {selected ? <>
               <span>Selected: {selected.name} {selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noopener noreferrer">Visit website</a>}</span>
-              <div className="booking-fields">
-                <label className="field">{label} date <input type="date" value={slot?.date ?? ""} onChange={event => updateSlot(selected.id, "date", event.target.value)} /></label>
-                <label className="field">{label} start (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="17:00" maxLength={5} value={slot?.start ?? ""} onChange={event => updateSlot(selected.id, "start", event.target.value)} /></label>
-                <label className="field">{label} end (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="19:00" maxLength={5} value={slot?.end ?? ""} onChange={event => updateSlot(selected.id, "end", event.target.value)} /></label>
-              </div>
-              {!slot?.date && <span className="booking-missing">Missing date for {selected.name}</span>}
-              {!slotValid && <span className="booking-missing">Missing or invalid time for {selected.name}: enter a same-day 24-hour slot with the end after the start.</span>}
+              <p>{slotValid && slot?.date ? `${slot.date} · ${slot.start}–${slot.end}` : <span className="booking-missing">Missing date or time</span>}</p>
+              <div className="decision-row"><button className="secondary-button" type="button" onClick={() => openSlot("vendor", selected.id, selected.name, slot)}> {slotValid && slot?.date ? "Change date and time" : "Choose date and time"}</button><button className="secondary-button" type="button" onClick={() => removeVendor(service, selected.id)}>Remove planned {label.toLowerCase()}</button></div>
+              {slot && (() => {
+                const otherVendors = service === "venue" ? [] : (Object.entries(selections) as [Service, string | undefined][]).filter(([key, id]) => key !== "venue" && id && id !== selected.id).flatMap(([, id]) => { const item = vendors.find(v => v.id === id); const itemSlot = id ? vendorSlots[id] : undefined; return item && itemSlot ? [{ id: item.id, name: item.name, slot: itemSlot }] : []; });
+                const overlaps = findScheduleOverlaps({ id: selected.id, name: selected.name, slot }, [...otherVendors, ...otherEvents]);
+                const venueSlot = selections.venue ? vendorSlots[selections.venue] : undefined;
+                const outsideVenue = service !== "venue" && !!venueSlot && validSchedule(venueSlot) && validSchedule(slot) && (slot.date !== venueSlot.date || slot.start < venueSlot.start || slot.end > venueSlot.end);
+                return <>{overlaps.length > 0 && <p className="booking-conflict" role="status">Overlaps with {overlaps.map(item => item.name).join(", ")}. Review whether the overlap is a problem.</p>}{outsideVenue && <p className="booking-conflict" role="status">Outside the venue access date or hours. Change the time or remove this planned vendor.</p>}</>;
+              })()}
             </> : <span className="booking-missing">Missing {label.toLowerCase()}</span>}
           </li>;
         })}</ul>
+        <section aria-labelledby="other-events-title"><h3 id="other-events-title">Other events to check</h3><p className="helper">Add other events here to check overlaps. Only events entered in this session can be checked.</p>
+          <button type="button" className="secondary-button" onClick={() => openSlot("event", crypto.randomUUID(), "")}>Add another event</button>
+          {otherEvents.map(event => <div key={event.id} className="booking-row"><p>{event.name}: {event.slot.date} · {event.slot.start}–{event.slot.end}</p>{findScheduleOverlaps(event, otherEvents).length > 0 && <p className="booking-conflict" role="status">Overlaps with {findScheduleOverlaps(event, otherEvents).map(item => item.name).join(", ")}. Review whether the overlap is a problem.</p>}<div className="decision-row"><button type="button" className="secondary-button" onClick={() => openSlot("event", event.id, event.name, event.slot)}>Change event</button><button type="button" className="secondary-button" onClick={() => { clearCheck(); setOtherEvents(current => current.filter(item => item.id !== event.id)); }}>Remove event</button></div></div>)}
+        </section>
         <section aria-labelledby="agent-check-title">
           <h3 id="agent-check-title">Check one vendor with the agents</h3>
           <p className="helper">Planning checks whether setup finishes before the event starts. If it finds a supported conflict, Recovery drafts follow-up tasks for your review. Times use New York time; the venue and vendor must be on the same date.</p>
@@ -227,6 +259,13 @@ export default function VendorFinder() {
           </div>}
           {recovery && <div><h4>Recovery suggestions for your review</h4>{recovery.proposed_tasks.length ? <ul>{recovery.proposed_tasks.map((task, i) => <li key={i}><strong>{task.title}</strong> — {task.reason}</li>)}</ul> : <p>No follow-up tasks were suggested.</p>}</div>}
         </section>
+      </dialog>
+      <dialog ref={slotDialog} className="booking-dialog" aria-labelledby="slot-title">
+        <div className="booking-heading"><h2 id="slot-title">{editing?.kind === "event" ? "Other event" : `Schedule ${editing?.name ?? "vendor"}`}</h2><button type="button" className="secondary-button" onClick={() => slotDialog.current?.close()}>Close</button></div>
+        {editing?.kind === "event" && <label className="field">Event name <input value={draftName} maxLength={120} onChange={e => setDraftName(e.target.value)} /></label>}
+        <div className="booking-fields"><label className="field">Date <input type="date" value={draftSlot.date} onChange={e => setDraftSlot(current => ({ ...current, date: e.target.value }))} /></label><label className="field">Start (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="17:00" maxLength={5} value={draftSlot.start} onChange={e => setDraftSlot(current => ({ ...current, start: e.target.value }))} /></label><label className="field">End (24-hour HH:MM) <input type="text" inputMode="numeric" placeholder="19:00" maxLength={5} value={draftSlot.end} onChange={e => setDraftSlot(current => ({ ...current, end: e.target.value }))} /></label></div>
+        {slotError && <p className="booking-missing" role="alert">{slotError}</p>}
+        <p className="helper">This is a local plan, not a confirmed reservation.</p><div className="decision-row"><button type="button" className="primary-button" onClick={saveSlot}>Save time</button><button type="button" className="secondary-button" onClick={() => slotDialog.current?.close()}>Cancel</button></div>
       </dialog>
     </main>
   );
