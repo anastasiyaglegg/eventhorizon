@@ -37,7 +37,8 @@ export function evaluateSchedule(value: unknown): { input: ScheduleReviewInput; 
       if (before < 60 || before > 180) add("catering_arrival", `${vendor.name}: start must be 1–3 hours before the event starts.`);
       if (after < 60 || after > 180) add("catering_finish", `${vendor.name}: finish must be 1–3 hours after the event ends.`);
     } else if (vendor.category === "florist" || vendor.category === "decorator") {
-      if (before > 48 * 60) add("decor_too_early", `${vendor.name}: start is more than 2 days before the event.`);
+      // The agreement is two calendar dates earlier, not a rolling 48-hour window.
+      if (arrival < start.startOf("day").minus({ days: 2 })) add("decor_too_early", `${vendor.name}: start is more than 2 calendar days before the event.`);
       if (finish > start) add("setup_into_event", `${vendor.name}: the recorded setup continues after the event begins. Confirm that this is intended.`);
     } else {
       if (before < 60) add("needs_early_setup", `${vendor.name}: start must be at least 1 hour before the event begins.`);

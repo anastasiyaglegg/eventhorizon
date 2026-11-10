@@ -23,7 +23,8 @@ test("other vendors start at least an hour early and may overlap", () => {
 test("florists and decorators may set up together up to two days before", () => {
   for (const kind of ["florist", "decorator"]) {
     assert.deepEqual(check(vendor(kind, "18:00", "19:00", "2026-11-18")), []);
-    assert.equal(check(vendor(kind, "17:59", "19:00", "2026-11-18"))[0].code, "decor_too_early");
+    assert.deepEqual(check(vendor(kind, "09:00", "19:00", "2026-11-18")), []);
+    assert.equal(check(vendor(kind, "23:00", "23:30", "2026-11-17"))[0].code, "decor_too_early");
   }
   assert.deepEqual(check(vendor("florist", "18:00", "19:00", "2026-11-18"), vendor("decorator", "18:00", "19:00", "2026-11-18")), []);
 });
