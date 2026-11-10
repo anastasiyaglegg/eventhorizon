@@ -1,17 +1,17 @@
 :root {
-  --ink: #172033;
-  --muted: #63718a;
-  --line: #dbe3ef;
-  --panel: #ffffff;
-  --soft: #f4f7fb;
-  --blue: #2458b7;
-  --blue-soft: #eaf1ff;
-  --green: #16724a;
-  --green-soft: #e8f7ef;
-  --amber: #9a5b00;
-  --amber-soft: #fff3d9;
-  --red: #a52b31;
-  --red-soft: #fff0f0;
+  --ink: #f6f4ff;
+  --muted: #b7c3dd;
+  --line: #3c466b;
+  --panel: #161d39;
+  --soft: #202a4a;
+  --blue: #c9acff;
+  --blue-soft: #332b55;
+  --green: #9ce6c7;
+  --green-soft: #1b3e3b;
+  --amber: #f5cc87;
+  --amber-soft: #403426;
+  --red: #ffb5bd;
+  --red-soft: #482b3b;
 }
 
 * { box-sizing: border-box; }
@@ -19,7 +19,7 @@
 body {
   margin: 0;
   color: var(--ink);
-  background: #f0f4f9;
+  background: radial-gradient(circle at 80% -15%, #2c2854 0, transparent 39%), #0b1025;
   font-family: Arial, Helvetica, sans-serif;
 }
 
@@ -253,3 +253,57 @@ p { line-height: 1.55; }
 @media (max-width: 700px) { .site-nav { display: block; padding: 15px 16px; }.site-nav-links { margin-top: 10px; overflow-x: auto; flex-wrap: nowrap; }.site-nav-links a { white-space: nowrap; padding: 8px 10px; }.cosmos-hero { min-height: 670px; }.cosmos-hero-content { padding: 80px 0 175px; }.theme-section { padding-top: 55px; }.theme-section-head { display: block; }.theme-counter { display: inline-block; margin-bottom: 12px; }.theme-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }.theme-next, .cosmos-footer, .workspace-heading { display: block; }.theme-next .cosmos-button { margin-top: 18px; }.cosmos-footer div { margin-top: 12px; }.calendar-day { min-height: 72px; padding: 4px; }.calendar-chip { font-size: .55rem; }.conflict-summary { gap: 6px; }.conflict-summary > div { padding: 10px; }.rules-grid { grid-template-columns: 1fr; } }
 @media (max-width: 450px) { .theme-grid { grid-template-columns: 1fr; }.calendar-day { min-height: 58px; }.calendar-day-items { display: none; } }
 @media (prefers-reduced-motion: reduce) { .star-field i, .horizon-line, .horizon-glow, .cosmos-orb { animation: none; }.theme-card, .cosmos-button { transition: none; } }
+
+/* The planning workspace shares the same night sky, violet, and gold language. */
+.page-shell { min-height: calc(100vh - 74px); }
+.panel, .calendar-panel, .conflict-summary > div, .booking-dialog {
+  color: var(--ink); background: var(--panel); border-color: var(--line);
+  box-shadow: 0 18px 45px #03071344;
+}
+.fact, .comparison-card, .metric, .calendar-day, .calendar-icon-button,
+.vendor-name-search, .planned-item { color: var(--ink); background: var(--soft); border-color: var(--line); }
+.comparison-card.proposed { background: #342b5e; border-color: #8062bd; }
+.field input, .calendar-form input, .booking-row select {
+  color: var(--ink); background: #111a34; border-color: #617096; color-scheme: dark;
+}
+.field input::placeholder, .calendar-form input::placeholder { color: #9caacc; }
+.primary-button { color: #16132b; background: linear-gradient(110deg, #f8d9a1, #dcb7fa); }
+.secondary-button { color: var(--ink); background: #30395c; border: 1px solid #68729b; }
+.decision-button.approve { color: #102b28; background: #9ce6c7; }
+.decision-button.reject { color: #341820; background: #ffc1ca; }
+.tag.unknown { color: var(--muted); background: #30395c; }
+.calendar-day:hover { background: #2b3559; border-color: #bca0ed; }
+.calendar-day.active { background: #3a315f; border-color: #e9b9f9; }
+.calendar-chip { color: #e4d8ff; background: #433969; }
+.calendar-chip.event { color: #ffe2f6; background: #693d68; }
+.calendar-chip.vendor { color: #d4fff2; background: #245a5a; }
+.finding-card { color: var(--ink); background: #3a2b3b; border-color: #a56872; }
+.finding-card.check { background: #3c3728; border-color: #b39557; }
+.booking-conflict { color: #ffd1d6; background: #482b3b; border-color: #ef899d; }
+.booking-missing { color: #ffb5bd; }
+.alert { border-color: #b26a7c; }.success { border-color: #6bb79d; }
+.risk-item { border-color: #ae8b57; }
+.task-item { border-left-color: #d9b9f2; }
+a { color: #d8b9ff; }
+a:hover { color: #ffe0b6; }
+.site-nav a, .cosmos-footer a, .cosmos-button { color: inherit; }
+.cosmos-button { color: #19203b; }
+
+/* Gatsby has deco arches and gold; Stardust is a pink glitter cloud. */
+.theme-card[data-theme-id="galactic-gatsby"] .theme-sky {
+  background: repeating-linear-gradient(90deg, transparent 0 18px, #cda75d38 19px 20px, transparent 21px 38px),
+    radial-gradient(ellipse at 50% 100%, #d5a94d77, transparent 66%),
+    linear-gradient(145deg, #101322, #3c2c27 70%, #171821);
+}
+.theme-card[data-theme-id="galactic-gatsby"] .theme-sky::before {
+  content: ""; position: absolute; top: 11%; width: 44%; height: 104px;
+  border: 2px solid #e6bf74; border-bottom: 0; border-radius: 100% 100% 0 0;
+  box-shadow: 0 0 28px #f6ce6b55, 0 0 0 10px #1b1b2a, 0 0 0 12px #aa884d;
+}
+.theme-card[data-theme-id="stardust-soiree"] .theme-sky {
+  background: radial-gradient(circle at 13% 28%, #fff 0 1px, transparent 3px),
+    radial-gradient(circle at 81% 21%, #ffe6fa 0 2px, transparent 4px),
+    radial-gradient(circle at 68% 71%, #fff 0 1px, transparent 3px),
+    radial-gradient(ellipse at 50% 65%, #f9a5edaa, transparent 65%),
+    linear-gradient(135deg, #523363, #82679f 60%, #332b67);
+}

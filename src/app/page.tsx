@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useEventPlan } from "../client/event-plan";
 
 const themes = [
-  { id: "galactic-gatsby", icon: "✦", name: "Galactic Gatsby", line: "Art deco met a UFO and both overdressed.", colors: ["#f6d57c", "#8c55fa"] },
+  { id: "galactic-gatsby", icon: "◈", name: "Galactic Gatsby", line: "Gold tuxedos, cosmic champagne, zero restraint.", colors: ["#f4cf79", "#8f672e"] },
   { id: "disco-supernova", icon: "🪩", name: "Disco Supernova", line: "A dance floor visible from another galaxy.", colors: ["#ff6bd6", "#7b6dff"] },
   { id: "black-hole-brunch", icon: "☕", name: "Black Hole Brunch", line: "Bottomless mimosas. Questionable gravity.", colors: ["#f9a86a", "#4d52ae"] },
   { id: "moonlight-masquerade", icon: "☾", name: "Moonlight Masquerade", line: "Masks, moonbeams, and excellent secrets.", colors: ["#b9c7ff", "#6f5fd0"] },
   { id: "cosmic-carnival", icon: "🎡", name: "Cosmic Carnival", line: "Cotton candy with a side of chaos.", colors: ["#ff8caa", "#fbad63"] },
   { id: "interstellar-garden", icon: "✿", name: "Interstellar Garden", line: "Flowers that look suspiciously celestial.", colors: ["#9af0cc", "#708dff"] },
   { id: "retro-rocket-rave", icon: "🚀", name: "Retro Rocket Rave", line: "Midcentury sci-fi, maximalist dance moves.", colors: ["#ffb354", "#ff5c8f"] },
-  { id: "stardust-soiree", icon: "✧", name: "Stardust Soirée", line: "Sparkle responsibly. Or don't.", colors: ["#f7cbe7", "#7b7fea"] },
+  { id: "stardust-soiree", icon: "✨", name: "Stardust Soirée", line: "A glitter storm with a guest list.", colors: ["#ffc4ec", "#bda9ff"] },
   { id: "saturn-sweet-sixteen", icon: "🪐", name: "Saturn's Sweet Sixteen", line: "The rings are not optional accessories.", colors: ["#ffd889", "#e893d0"] },
   { id: "nebula-nonsense", icon: "☁", name: "Nebula Nonsense", line: "A very serious excuse for dramatic fog.", colors: ["#b28bff", "#42c9d7"] },
   { id: "orbiting-opera", icon: "♫", name: "Orbiting Opera", line: "Big feelings. Bigger chandeliers.", colors: ["#ef7f97", "#d8adff"] },
@@ -49,7 +49,7 @@ export default function Home() {
         <span className="theme-counter">12 ridiculous possibilities</span>
       </div>
       <div className="theme-grid">{themes.map(theme => <button
-        key={theme.id} type="button" className={`theme-card ${plan.themeId === theme.id ? "selected" : ""}`}
+        key={theme.id} type="button" data-theme-id={theme.id} className={`theme-card ${plan.themeId === theme.id ? "selected" : ""}`}
         style={{ "--theme-a": theme.colors[0], "--theme-b": theme.colors[1] } as React.CSSProperties}
         aria-pressed={plan.themeId === theme.id} onClick={() => setField("themeId")(theme.id)}>
         <span className="theme-sky"><span className="theme-icon" aria-hidden="true">{theme.icon}</span></span>
