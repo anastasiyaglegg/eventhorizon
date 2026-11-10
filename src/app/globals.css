@@ -144,3 +144,10 @@ p { line-height: 1.55; }
 
 .vendor-name-search { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; padding: 14px; margin: 0 0 16px; border: 1px solid #c8d1d7; border-radius: 10px; background: #f8fbfa; }
 .vendor-name-search .field { flex: 1 1 240px; }
+
+.review-steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+.review-step { padding: 8px 12px; border-radius: 999px; background: #e8edf5; color: #4a5870; font-size: .85rem; font-weight: 700; }
+.review-step.current { background: #dbe9ff; color: #173f8b; }
+.event-vendor { margin: 16px 0 0; }
+.review-grid:focus { outline: none; }
+.risk-item summary { cursor: pointer; font-weight: 700; }
