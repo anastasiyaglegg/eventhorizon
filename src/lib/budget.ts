@@ -1,9 +1,10 @@
 import type { EventPlanData } from "./plan-contract";
 import type { Vendor } from "./vendor-search";
+import { serviceLabels } from "./services";
 
 type BudgetPlan = Pick<EventPlanData, "selections" | "vendorEstimates" | "categoryBudgets" | "budgetLimit">;
 type PriceSource = Pick<Vendor, "id" | "priceMin">;
-const amountCents = (value: string | undefined) => value && /^\d{1,9}(?:\.\d{1,2})?$/.test(value) ? Math.round(Number(value) * 100) : null;
+export const amountCents = (value: string | undefined) => value && /^\d{1,9}(?:\.\d{1,2})?$/.test(value) ? Math.round(Number(value) * 100) : null;
 
 /** User estimates take precedence. Otherwise a listed starting price is a planning floor, never a quote. */
 export function budgetSummary(plan: BudgetPlan, vendors: PriceSource[] = []) {
@@ -37,7 +38,10 @@ export function buildBudgetFindings(plan: BudgetPlan, vendors: PriceSource[]): B
     if (!id) continue;
     const cap = amountCents(plan.categoryBudgets?.[service as keyof NonNullable<BudgetPlan["categoryBudgets"]>]);
     const estimate = amountCents(plan.vendorEstimates[id]) ?? (vendors.find(vendor => vendor.id === id)?.priceMin == null ? null : Math.round(vendors.find(vendor => vendor.id === id)!.priceMin! * 100));
-    if (cap !== null && estimate !== null && estimate > cap) findings.push({ id: `category-over:${service}`, title: `${service} exceeds its category budget`, detail: `This selected listing is ${money(estimate - cap)} above the amount assigned to ${service}.`, tone: "needs-action" });
+    if (cap !== null && estimate !== null && estimate > cap) {
+      const label = serviceLabels[service as keyof typeof serviceLabels];
+      findings.push({ id: `category-over:${service}`, title: `${label} exceeds its category budget`, detail: `This selected listing is ${money(estimate - cap)} above the amount assigned to ${label}.`, tone: "needs-action" });
+    }
   }
   if (summary.unknownCount) findings.push({ id: "budget-unknown", title: "Some prices are still unknown", detail: `${summary.unknownCount} selected listing${summary.unknownCount === 1 ? " has" : "s have"} no entered estimate or listed starting price. The total may increase.`, tone: "check" });
   if (summary.startingPriceCount) findings.push({ id: "budget-starting", title: "Starting prices need confirmation", detail: `${summary.startingPriceCount} listed starting price${summary.startingPriceCount === 1 ? " is" : "s are"} used in this planning total. Ask the vendor for an actual quote.`, tone: "check" });

@@ -19,6 +19,7 @@ export const recommendationInputSchema = z.object({
   venueId: z.string().max(80).optional(),
   selectedServices: z.array(service.exclude(["venue"])).max(7).optional(),
   selectedVendorIds: z.array(z.string().min(1).max(80)).max(7).optional(),
+  vendorEstimates: z.record(z.string().min(1).max(80), z.number().nonnegative().max(100_000_000)).optional(),
   categoryBudgets: z.partialRecord(service, z.number().nonnegative()).optional(),
   candidates: z.array(candidate).max(120),
 }).strict();
@@ -40,10 +41,34 @@ export type RecommendationResponse = z.infer<typeof recommendationResponseSchema
 export type RecommendationCandidate = z.infer<typeof candidate>;
 export type RecommendationRanker = (input: { phase: RecommendationInput["phase"]; budget: number; availableBudget: number; guests: number; venueBorough?: string; candidates: RecommendationCandidate[] }, signal?: AbortSignal) => Promise<unknown>;
 
-function fit(candidate: RecommendationCandidate, guests: number, budget: number) {
+/** Keep current choices in the snapshot, then take up to 15 listings per service. */
+export function selectRecommendationCandidates(candidates: RecommendationCandidate[], venueId?: string, selectedVendorIds: string[] = []) {
+  const selected = [venueId, ...selectedVendorIds].filter((id): id is string => !!id);
+  const result: RecommendationCandidate[] = [];
+  const seen = new Set<string>();
+  const counts = new Map<RecommendationCandidate["service"], number>();
+  const add = (item: RecommendationCandidate | undefined) => {
+    if (!item || seen.has(item.id) || result.length >= 120 || (counts.get(item.service) ?? 0) >= 15) return;
+    result.push(item); seen.add(item.id); counts.set(item.service, (counts.get(item.service) ?? 0) + 1);
+  };
+  for (const id of selected) add(candidates.find(item => item.id === id));
+  for (const item of candidates) add(item);
+  return result;
+}
+
+export function selectedIdsInCandidates(selectedVendorIds: string[], candidates: RecommendationCandidate[]) {
+  const availableIds = new Set(candidates.map(candidate => candidate.id));
+  return selectedVendorIds.filter(id => availableIds.has(id));
+}
+
+function effectivePriceCents(candidate: RecommendationCandidate, estimates: RecommendationInput["vendorEstimates"]) {
+  return cents(estimates?.[candidate.id] ?? candidate.priceMin ?? 0);
+}
+
+function fit(candidate: RecommendationCandidate, guests: number, budget: number, estimates: RecommendationInput["vendorEstimates"]) {
   return (candidate.capacityMin === null || candidate.capacityMin <= guests)
     && (candidate.capacityMax === null || candidate.capacityMax >= guests)
-    && (candidate.priceMin === null || cents(candidate.priceMin) <= cents(budget));
+    && effectivePriceCents(candidate, estimates) <= cents(budget);
 }
 
 export const cents = (amount: number) => Math.round(amount * 100);
@@ -55,7 +80,7 @@ export function committedCents(input: RecommendationInput, choiceIds: string[] =
     if (!id) continue;
     const listing = input.candidates.find(item => item.id === id);
     if (!listing) throw new Error("A selected listing is missing from the directory snapshot.");
-    byService.set(listing.service, Math.max(byService.get(listing.service) ?? 0, cents(listing.priceMin ?? 0)));
+    byService.set(listing.service, Math.max(byService.get(listing.service) ?? 0, effectivePriceCents(listing, input.vendorEstimates)));
   }
   return [...byService.values()].reduce((total, value) => total + value, 0);
 }
@@ -71,14 +96,14 @@ export function recommendationPool(input: RecommendationInput) {
   if (allocated > cents(input.budget)) throw new Error("Assigned vendor budgets exceed the total event budget.");
   const venue = input.venueId ? input.candidates.find(item => item.id === input.venueId && item.service === "venue") : undefined;
   if (input.phase === "vendors" && !venue) throw new Error("Choose a venue before requesting vendor suggestions.");
-  if (input.phase === "vendors" && venue && !fit(venue, input.guests, input.budget)) throw new Error("The chosen venue does not fit the guest count or budget. Choose another venue or update your event details.");
-  if (venue && input.categoryBudgets?.venue !== undefined && venue.priceMin !== null && cents(venue.priceMin) > cents(input.categoryBudgets.venue)) throw new Error("The chosen venue costs more than its assigned budget.");
+  if (input.phase === "vendors" && venue && !fit(venue, input.guests, input.budget, input.vendorEstimates)) throw new Error("The chosen venue does not fit the guest count or budget. Choose another venue or update your event details.");
+  if (venue && input.categoryBudgets?.venue !== undefined && effectivePriceCents(venue, input.vendorEstimates) > cents(input.categoryBudgets.venue)) throw new Error("The chosen venue costs more than its assigned budget.");
   const remaining = cents(input.budget) - committedCents(input);
   if (input.phase === "vendors" && remaining < 0) throw new Error("The chosen venue, vendors, and assigned budgets already exceed the event budget.");
   const eligible = input.candidates.filter(item => (input.phase === "venue" ? item.service === "venue" : item.service !== "venue")
     && (input.phase === "venue" || !input.selectedServices?.includes(item.service as Exclude<typeof item.service, "venue">))
-    && fit(item, input.guests, input.budget)
-    && (input.categoryBudgets?.[item.service] === undefined || item.priceMin === null || cents(item.priceMin) <= cents(input.categoryBudgets[item.service]!))
+    && fit(item, input.guests, input.budget, input.vendorEstimates)
+    && (input.categoryBudgets?.[item.service] === undefined || effectivePriceCents(item, input.vendorEstimates) <= cents(input.categoryBudgets[item.service]!))
     && committedCents(input, [item.id]) <= cents(input.budget));
   if (input.phase === "venue") return eligible.sort(rankByKnownFacts).slice(0, 15);
   const perService = new Map<string, number>();

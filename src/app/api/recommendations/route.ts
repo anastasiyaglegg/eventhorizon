@@ -15,6 +15,7 @@ export async function POST(request: Request) {
     return Response.json(await recommend(body, ranker, request.signal));
   } catch (error) {
     if (error instanceof ZodError) return Response.json({ error: "Enter a valid budget and guest count before requesting suggestions." }, { status: 400 });
+    if (error instanceof Error && error.message.startsWith("A selected listing")) return Response.json({ error: "One of your selected vendors isn't in the loaded directory. Remove it or reload." }, { status: 422 });
     if (error instanceof Error && (error.message.startsWith("No directory") || error.message.startsWith("No vendor combination") || error.message.startsWith("Choose a venue") || error.message.startsWith("The chosen venue") || error.message.startsWith("Assigned vendor budgets"))) {
       return Response.json({ error: error.message }, { status: 422 });
     }

@@ -40,10 +40,11 @@ export async function recommend(inputValue: unknown, ranker?: RecommendationRank
   const input = recommendationInputSchema.parse(inputValue);
   const pool = recommendationPool(input);
   if (!pool.length) throw new Error("No directory listings fit the stated budget and guest count.");
-  const agentChoice = ranker ? recommendationChoiceSchema.parse(await ranker({ phase: input.phase, budget: input.budget, availableBudget: (cents(input.budget) - committedCents(input)) / 100, guests: input.guests, venueBorough: input.candidates.find(item => item.id === input.venueId)?.borough, candidates: pool }, signal)).ids
+  const agentChoiceRaw = ranker ? recommendationChoiceSchema.parse(await ranker({ phase: input.phase, budget: input.budget, availableBudget: (cents(input.budget) - committedCents(input)) / 100, guests: input.guests, venueBorough: input.candidates.find(item => item.id === input.venueId)?.borough, candidates: pool }, signal)).ids
     : directoryChoice(input, pool);
-  if (!agentChoice.length) throw new Error("No vendor combination fits the known starting prices within this budget.");
-  if (new Set(agentChoice).size !== agentChoice.length || agentChoice.some(id => !pool.some(item => item.id === id))) throw new Error("The recommendation included an unknown or repeated vendor.");
+  if (!agentChoiceRaw.length) throw new Error("No vendor combination fits the known starting prices within this budget.");
+  if (new Set(agentChoiceRaw).size !== agentChoiceRaw.length || agentChoiceRaw.some(id => !pool.some(item => item.id === id))) throw new Error("The recommendation included an unknown or repeated vendor.");
+  const agentChoice = input.phase === "venue" ? agentChoiceRaw.slice(0, 3) : agentChoiceRaw;
   if (input.phase === "vendors") {
     const services = agentChoice.map(id => pool.find(item => item.id === id)!.service);
     if (new Set(services).size !== services.length) throw new Error("The recommendation repeated a vendor category.");

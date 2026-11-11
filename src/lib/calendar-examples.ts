@@ -16,7 +16,7 @@ export function calendarExamples(eventDate: string, now = DateTime.now().setZone
   const anchor = selected.isValid && selected.toISODate() === eventDate ? selected : now;
   // Keep all three events visible in the calendar's focused month, even if the
   // coordinator's event happens near the end of that month.
-  const firstDay = Math.min(Math.max(anchor.day, 2), anchor.daysInMonth! - 7);
+  const firstDay = anchor.day > anchor.daysInMonth! - 7 ? anchor.day - 7 : Math.max(anchor.day, 2);
   const base = anchor.set({ day: firstDay });
   const day = (offset: number) => base.plus({ days: offset }).toISODate()!;
   const slot = (offset: number, start: string, end: string): ScheduleSlot => ({ date: day(offset), start, end });

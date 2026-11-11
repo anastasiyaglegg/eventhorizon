@@ -1,6 +1,7 @@
 import type { EventPlan } from "../client/event-plan";
 import type { Service } from "../client/event-plan";
 import type { Vendor } from "./vendor-search";
+import { serviceLabels } from "./services";
 import { evaluateSchedule, type ScheduleIssue } from "./schedule-rules";
 import { findScheduleOverlaps, overlapsForOtherEvent, validSchedule } from "./schedule-conflicts";
 
@@ -20,6 +21,25 @@ export function selectedVendorSchedules(plan: Pick<EventPlan, "selections" | "ve
     const name = vendor ? vendor.name.slice(0, 200) : `Selected ${fallbackNames[service].toLowerCase()} (details not loaded)`;
     return [{ id, name, category: service, slot: plan.vendorSlots[id] ?? null, missing: !vendor }];
   });
+}
+
+/** Include missing directory entries so a coordinator can still change or remove a saved choice. */
+export function selectedPlanRows(plan: Pick<EventPlan, "selections" | "vendorSlots">, vendors: Vendor[]) {
+  const venueId = plan.selections.venue;
+  const venue = venueId ? vendors.find(item => item.id === venueId) : undefined;
+  const venueRows = venueId ? [{ service: "venue" as Service, id: venueId, name: venue?.name ?? "Selected venue (details not loaded)", vendor: venue }] : [];
+  const vendorRows = selectedVendorSchedules(plan, vendors).map(item => ({
+    service: item.category as Service, id: item.id, name: item.name,
+    vendor: vendors.find(vendor => vendor.id === item.id),
+  }));
+  return [...venueRows, ...vendorRows];
+}
+
+export function vendorResultAction(vendor: Pick<Vendor, "id" | "name" | "service">, selections: EventPlan["selections"]) {
+  const service = vendor.service as Service;
+  if (selections[service] === vendor.id) return { label: "Already in your plan", disabled: true };
+  if (selections[service]) return { label: `Replace planned ${serviceLabels[service].toLowerCase()} with ${vendor.name}`, disabled: false };
+  return { label: `Add ${vendor.name} to plan`, disabled: false };
 }
 
 /** All events and scheduled vendor work use one event room. Concurrent vendors are allowed. */

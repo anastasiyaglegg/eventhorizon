@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { recommend } from "../src/server/recommendations";
-import type { RecommendationInput, RecommendationCandidate } from "../src/lib/recommendations";
+import { selectRecommendationCandidates, selectedIdsInCandidates, type RecommendationInput, type RecommendationCandidate } from "../src/lib/recommendations";
 import { sampleVendors } from "../src/lib/vendor-search";
 
 const item = (id: string, service: RecommendationCandidate["service"], priceMin: number | null, capacityMax: number | null): RecommendationCandidate =>
@@ -21,6 +21,23 @@ test("venue suggestions exclude listings that cannot fit the guests or budget", 
   assert.equal(result.source, "ai");
   assert.deepEqual(result.ids, ["venue-fit"]);
   assert.match(result.snapshot_hash, /^[a-f0-9]{64}$/);
+});
+
+test("server caps an AI venue shortlist at three", async () => {
+  const venues = Array.from({ length: 4 }, (_, index) => item(`venue-${index}`, "venue", 1000, 100));
+  const result = await recommend({ phase: "venue", budget: 5000, guests: 80, candidates: venues }, async () => ({ ids: venues.map(venue => venue.id) }));
+  assert.deepEqual(result.ids, ["venue-0", "venue-1", "venue-2"]);
+});
+
+test("candidate cap keeps chosen listings and at most fifteen per service", () => {
+  const services: RecommendationCandidate["service"][] = ["venue", "catering", "florist", "entertainment", "bakery", "av", "photography", "decorator"];
+  const large = services.flatMap(service => Array.from({ length: 25 }, (_, index) => item(`${service}-${index}`, service, 100, 100)));
+  const chosen = selectRecommendationCandidates(large, "venue-24", ["florist-24", "missing-id"]);
+  assert.deepEqual(chosen.slice(0, 2).map(candidate => candidate.id), ["venue-24", "florist-24"]);
+  assert.equal(chosen.length, 120);
+  for (const service of services) assert.equal(chosen.filter(candidate => candidate.service === service).length, 15);
+  assert.equal(chosen.some(candidate => candidate.id === "missing-id"), false);
+  assert.deepEqual(selectedIdsInCandidates(["florist-24", "missing-id"], chosen), ["florist-24"]);
 });
 
 test("stack rejects repeated categories and a known over-budget combination", async () => {
@@ -110,4 +127,12 @@ test("recommendations honor a budget down to the cent", async () => {
   await assert.rejects(recommend({ phase: "vendors", budget: 1200.29, guests: 80, venueId: "venue", candidates: prices }), /No directory listings/);
   const result = await recommend({ phase: "vendors", budget: 1200.30, guests: 80, venueId: "venue", candidates: prices });
   assert.deepEqual(result.ids, ["florist"]);
+});
+
+test("entered estimates replace starting prices in vendor budget decisions", async () => {
+  const listings = [item("venue", "venue", 1000, 100), item("florist", "florist", 200, 100)];
+  const base: RecommendationInput = { phase: "vendors", budget: 1500, guests: 80, venueId: "venue", candidates: listings };
+  assert.deepEqual((await recommend(base)).ids, ["florist"]);
+  await assert.rejects(recommend({ ...base, vendorEstimates: { venue: 1400, florist: 300 } }), /No directory listings/);
+  assert.deepEqual((await recommend({ ...base, vendorEstimates: { venue: 1100, florist: 300 } })).ids, ["florist"]);
 });

@@ -22,6 +22,20 @@ plan does not make a reservation or send an email.
 - Keep a plan on this device. Save & share offers a live shared plan when the
   migration below is installed, or a clearly labeled copy link when it is not.
 
+## Suggestions and saved choices
+
+Venue suggestions show at most three choices. The recommendation request keeps
+the chosen venue and selected vendors that are still in the loaded directory, then includes
+up to 15 listings per category. If a selected vendor is missing from the loaded
+directory, the plan still shows its saved choice. You can set its time, remove
+it, or search for a replacement. A search result already in the plan is labeled
+**Already in your plan**.
+
+Budget totals use complete dollar amounts. While an estimate is unfinished,
+such as `500.`, the planning views use the listing's starting price until the
+estimate is valid. Category budget warnings use readable service names. The
+fictional calendar examples stay in the event's month and off its date.
+
 ## Run locally
 
 Use Node.js 22 or newer. Run `npm ci`, copy `.env.example` to `.env.local`, and

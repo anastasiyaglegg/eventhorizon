@@ -4,8 +4,10 @@ import { createContext, useContext, useEffect, useRef, useState, type Dispatch, 
 import { sampleVendors, type Vendor } from "../lib/vendor-search";
 import type { NamedSchedule, ScheduleSlot } from "../lib/schedule-conflicts";
 import { eventPlanSchema, type EventPlanData } from "../lib/plan-contract";
+import { serviceLabels } from "../lib/services";
+import { SaveRevision } from "../lib/save-revision";
 
-export const serviceLabels = { venue: "Venue", catering: "Caterer", florist: "Florist", entertainment: "DJ / entertainment", bakery: "Bakery", av: "AV", photography: "Photographer", decorator: "Decorator" } as const;
+export { serviceLabels };
 export type Service = keyof typeof serviceLabels;
 
 export type EventPlan = EventPlanData;
@@ -89,6 +91,7 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
   const [directoryWarning, setDirectoryWarning] = useState<string | null>(null);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
   const editedDuringLoad = useRef(false);
+  const saveRevision = useRef(new SaveRevision());
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -169,7 +172,7 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
   }, []);
 
   function setField<K extends keyof EventPlan>(key: K): Dispatch<SetStateAction<EventPlan[K]>> {
-    return value => { editedDuringLoad.current = true; if (shared) { setUnsavedChanges(true); sessionStorage.setItem(dirtySharedKey, JSON.stringify({ id: shared.id, version: shared.version })); } setPlan(current => ({
+    return value => { editedDuringLoad.current = true; saveRevision.current.edit(); if (shared) { setUnsavedChanges(true); sessionStorage.setItem(dirtySharedKey, JSON.stringify({ id: shared.id, version: shared.version })); } setPlan(current => ({
       ...current,
       [key]: typeof value === "function" ? (value as (previous: EventPlan[K]) => EventPlan[K])(current[key]) : value,
     })); };
@@ -190,16 +193,17 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
     const parsed = eventPlanSchema.safeParse(plan);
     if (!parsed.success) throw new Error("Check the event details before saving the plan.");
     if (shared && !unsavedChanges) return { link: `${location.origin}${location.pathname}?plan=${shared.id}#key=${shared.token}`, live: true };
+    const sentRevision = saveRevision.current.snapshot();
     const body = shared ? { id: shared.id, token: shared.token, version: shared.version, plan: parsed.data } : { plan: parsed.data };
     try {
       const response = await fetch("/api/plans", { method: shared ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await response.json() as { id?: string; token?: string; version?: number; error?: string };
       if (!response.ok) throw new Error(data.error ?? "Could not save the plan.");
-      if (shared && data.version) { const next = { ...shared, version: data.version }; setShared(next); setUnsavedChanges(false); sessionStorage.removeItem(dirtySharedKey); sessionStorage.setItem(sharedStorageKey, JSON.stringify(next)); return { link: `${location.origin}${location.pathname}?plan=${shared.id}#key=${shared.token}`, live: true }; }
+      if (shared && data.version) { const next = { ...shared, version: data.version }; setShared(next); const changed = saveRevision.current.changedSince(sentRevision); setUnsavedChanges(changed); if (changed) sessionStorage.setItem(dirtySharedKey, JSON.stringify({ id: next.id, version: next.version })); else sessionStorage.removeItem(dirtySharedKey); sessionStorage.setItem(sharedStorageKey, JSON.stringify(next)); return { link: `${location.origin}${location.pathname}?plan=${shared.id}#key=${shared.token}`, live: true }; }
       if (!data.id || !data.token || !data.version) throw new Error("Could not save the plan.");
       const next = { id: data.id, token: data.token, version: data.version };
       const url = `${location.origin}${location.pathname}?plan=${next.id}#key=${next.token}`;
-      history.replaceState(null, "", url); setShared(next); setDraftKey(draftKeyFor(next.id)); setUnsavedChanges(false); sessionStorage.removeItem(dirtySharedKey);
+      history.replaceState(null, "", url); setShared(next); setDraftKey(draftKeyFor(next.id)); const changed = saveRevision.current.changedSince(sentRevision); setUnsavedChanges(changed); if (changed) sessionStorage.setItem(dirtySharedKey, JSON.stringify({ id: next.id, version: next.version })); else sessionStorage.removeItem(dirtySharedKey);
       sessionStorage.setItem(sharedStorageKey, JSON.stringify(next));
       return { link: url, live: true };
     } catch (error) {
@@ -210,7 +214,7 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <PlanContext.Provider value={{ plan, setField, resetPlan: () => { setPlan(emptyPlan); setShared(null); setDraftKey(storageKey); setUnsavedChanges(false); sessionStorage.removeItem(sharedStorageKey); sessionStorage.removeItem(dirtySharedKey); history.replaceState(null, "", location.pathname); }, shared: !!shared, unsavedChanges, sharedLoadError, saveAndShare, refreshShared, vendors, directoryReady, directorySource, directoryWarning, directoryError }}>{children}</PlanContext.Provider>;
+  return <PlanContext.Provider value={{ plan, setField, resetPlan: () => { saveRevision.current.reset(); setPlan(emptyPlan); setShared(null); setDraftKey(storageKey); setUnsavedChanges(false); sessionStorage.removeItem(sharedStorageKey); sessionStorage.removeItem(dirtySharedKey); history.replaceState(null, "", location.pathname); }, shared: !!shared, unsavedChanges, sharedLoadError, saveAndShare, refreshShared, vendors, directoryReady, directorySource, directoryWarning, directoryError }}>{children}</PlanContext.Provider>;
 }
 
 export function useEventPlan() {

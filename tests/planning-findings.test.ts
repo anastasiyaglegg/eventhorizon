@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildPlanningFindings } from "../src/lib/planning-findings";
+import { buildPlanningFindings, selectedPlanRows, vendorResultAction } from "../src/lib/planning-findings";
 import type { EventPlan } from "../src/client/event-plan";
 import { sampleVendors } from "../src/lib/vendor-search";
 
@@ -54,4 +54,19 @@ test("a selected vendor missing from the loaded directory is still checked and i
   assert.equal(result.findings.some(item => item.id === "vendors-not-loaded"), true);
   assert.equal(result.findings.some(item => item.id === `${missingId}:catering_arrival`), true);
   assert.equal(result.findings.some(item => item.id === `${missingId}:catering_finish`), true);
+});
+
+test("missing selected vendors remain in the editable plan and replacement list", () => {
+  const draft = plan(); draft.selections = { venue: "missing-venue", catering: "missing-caterer" };
+  const rows = selectedPlanRows(draft, sampleVendors);
+  assert.deepEqual(rows.map(row => [row.service, row.id, row.name, row.vendor]), [
+    ["venue", "missing-venue", "Selected venue (details not loaded)", undefined],
+    ["catering", "missing-caterer", "Selected caterer (details not loaded)", undefined],
+  ]);
+});
+
+test("a search result already selected says so rather than offering to replace itself", () => {
+  const chosen = sampleVendors.find(vendor => vendor.service === "catering")!;
+  assert.deepEqual(vendorResultAction(chosen, { catering: chosen.id }), { label: "Already in your plan", disabled: true });
+  assert.match(vendorResultAction({ ...chosen, id: "another" }, { catering: chosen.id }).label, /^Replace planned caterer/);
 });

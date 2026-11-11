@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { budgetSummary, buildBudgetFindings, suggestCategoryBudgets } from "../src/lib/budget";
+import { amountCents, budgetSummary, buildBudgetFindings, suggestCategoryBudgets } from "../src/lib/budget";
 
 test("budget counts selected vendors once and keeps missing estimates visible", () => {
   const result = budgetSummary({
@@ -49,4 +49,18 @@ test("category budgets add once and show the amount left to assign", () => {
   assert.equal(result.assignedCents, 365050);
   assert.equal(result.unassignedCents, 134950);
   assert.equal(result.estimatedCents, 0);
+});
+
+test("unfinished decimal estimates use the listed starting price in both planning views", () => {
+  assert.equal(amountCents("500."), null);
+  const summary = budgetSummary({ selections: { catering: "c" }, vendorEstimates: { c: "500." }, budgetLimit: "1000" }, [{ id: "c", priceMin: 200 }]);
+  assert.equal(summary.estimatedCents, 20000);
+  assert.equal(summary.startingPriceCount, 1);
+});
+
+test("category budget findings use the readable service label", () => {
+  const findings = buildBudgetFindings({ selections: { av: "a" }, vendorEstimates: { a: "500" }, categoryBudgets: { av: "300" }, budgetLimit: "1000" }, []);
+  const finding = findings.find(item => item.id === "category-over:av")!;
+  assert.match(finding.title, /^AV exceeds/);
+  assert.match(finding.detail, /assigned to AV/);
 });

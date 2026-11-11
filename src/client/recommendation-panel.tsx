@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { serviceLabels, useEventPlan, type Service } from "./event-plan";
-import { recommendationResponseSchema, type RecommendationResponse } from "../lib/recommendations";
+import { cents, committedCents, recommendationResponseSchema, selectRecommendationCandidates, selectedIdsInCandidates, type RecommendationInput, type RecommendationResponse } from "../lib/recommendations";
 import { capacityLabel, samplePrice, type Vendor } from "../lib/vendor-search";
-import { budgetSummary, money, suggestCategoryBudgets } from "../lib/budget";
+import { amountCents, budgetSummary, money, suggestCategoryBudgets } from "../lib/budget";
 import { VendorDetailsDialog } from "./vendor-details";
 
 const cache = new Map<string, RecommendationResponse>();
@@ -23,12 +23,17 @@ export function RecommendationPanel() {
   const guests = Number(plan.eventGuests);
   const ready = directoryReady && Number.isFinite(budget) && budget > 0 && Number.isInteger(guests) && guests > 0;
   const phase = plan.selections.venue ? "vendors" : "venue";
-  const candidates = vendors.filter(vendor => Object.hasOwn(serviceLabels, vendor.service)).slice(0, 120).map(compact);
-  const selectedServices = (Object.keys(serviceLabels) as Service[]).filter(service => service !== "venue" && !!plan.selections[service]);
-  const selectedVendorIds = selectedServices.flatMap(service => plan.selections[service] ? [plan.selections[service]!] : []);
+  const selectedServices = (Object.keys(serviceLabels) as Service[]).filter((service): service is Exclude<Service, "venue"> => service !== "venue" && !!plan.selections[service]);
+  const selectedPlanIds = selectedServices.flatMap(service => plan.selections[service] ? [plan.selections[service]!] : []);
+  const candidates = selectRecommendationCandidates(vendors.filter(vendor => Object.hasOwn(serviceLabels, vendor.service)).map(compact), plan.selections.venue, selectedPlanIds);
+  const selectedVendorIds = selectedIdsInCandidates(selectedPlanIds, candidates);
   const categoryBudgets = Object.fromEntries(Object.entries(plan.categoryBudgets ?? {}).filter(([, amount]) => amount && Number(amount) > 0).map(([service, amount]) => [service, Number(amount)]));
+  const vendorEstimates = Object.fromEntries(candidates.flatMap(vendor => {
+    const estimate = amountCents(plan.vendorEstimates[vendor.id]);
+    return estimate === null ? [] : [[vendor.id, estimate / 100]];
+  }));
   const allCategoriesChosen = phase === "vendors" && selectedServices.length === 7;
-  const request = ready && !allCategoriesChosen ? { phase, budget, guests, venueId: plan.selections.venue, selectedServices, selectedVendorIds, categoryBudgets, candidates } : null;
+  const request: RecommendationInput | null = ready && !allCategoriesChosen ? { phase, budget, guests, venueId: plan.selections.venue, selectedServices, selectedVendorIds, categoryBudgets, vendorEstimates, candidates } : null;
   const key = request ? JSON.stringify(request) : "";
   const [result, setResult] = useState<{ key: string; value: RecommendationResponse } | null>(null);
   const [error, setError] = useState<{ key: string; message: string } | null>(null);
@@ -72,8 +77,8 @@ export function RecommendationPanel() {
   const searching = !!key && (loadingKey === key || (!response && error?.key !== key));
   const allocation = budgetSummary(plan, vendors);
   const planningPrice = (vendor: Vendor) => {
-    const estimate = plan.vendorEstimates[vendor.id];
-    return estimate !== undefined && estimate !== "" ? Number(estimate) : vendor.priceMin;
+    const estimate = amountCents(plan.vendorEstimates[vendor.id]);
+    return estimate === null ? vendor.priceMin : estimate / 100;
   };
   const budgetChoices = [venue, ...selectedVendorIds.map(id => vendors.find(vendor => vendor.id === id)), ...recommended]
     .filter((vendor): vendor is Vendor => !!vendor).map(vendor => ({ service: vendor.service as Service, priceMin: planningPrice(vendor) }));
@@ -82,6 +87,8 @@ export function RecommendationPanel() {
     .filter((vendor): vendor is Vendor => !!vendor).map(vendor => [vendor.id, vendor])).values()];
   const planningCostTotal = groupVendors.reduce((total, vendor) => total + (planningPrice(vendor) ?? 0), 0);
   const unknownPlanningPrices = groupVendors.filter(vendor => planningPrice(vendor) === null).length;
+  const groupFitsBudget = !!request && (!request.venueId || candidates.some(vendor => vendor.id === request.venueId))
+    && committedCents(request, recommended.map(vendor => vendor.id)) <= cents(budget);
   function possibleOption(service: Service) {
     const categoryLimit = Number(plan.categoryBudgets?.[service] || 0);
     return vendors.filter(vendor => vendor.service === service
@@ -107,6 +114,7 @@ export function RecommendationPanel() {
 
   function chooseVenue(id: string) { setField("selections")(current => ({ ...current, venue: id })); }
   function chooseGroup() {
+    if (!groupFitsBudget) return;
     setField("selections")(current => {
       const next = { ...current };
       for (const vendor of recommended) {
@@ -136,7 +144,7 @@ export function RecommendationPanel() {
           const emptyText = venueTooSmall ? "Choose a venue that fits your guests first" : searching ? "Checking the directory…" : possible ? `Possible option: ${possible.name} · ${possible.borough}${overBy > 0 ? ` · would put known starting prices ${money(overBy)} over budget` : possible.priceMin === null ? " · price unknown" : " · review before adding"}` : "No listing fits your guests and category budget";
           const shown = selected ?? suggested;
           return <li key={service}><div><strong>{serviceLabels[service]}</strong><p>{shown ? <>{detailsButton(shown)} · {selected ? "already in your plan" : shown.borough}</> : emptyText}</p>{shown && <small>{shown.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(shown)} · Capacity: {capacityLabel(shown)}</small>}</div><div className="recommendation-budget-fields">{budgetField(service, shown?.priceMin ?? null)}{estimateField(shown)}</div></li>;
-        })}</ul><div className="category-budget-total"><strong>Planning cost with this group: {money(Math.round(planningCostTotal * 100))}</strong><span>{unknownPlanningPrices ? `${unknownPlanningPrices} price${unknownPlanningPrices === 1 ? "" : "s"} still unknown` : planningCostTotal > budget ? `${money(Math.round((planningCostTotal - budget) * 100))} over event budget` : `${money(Math.round((budget - planningCostTotal) * 100))} under event budget`}</span></div><div className="category-budget-total"><strong>Assigned category budgets: {money(allocation.assignedCents)}</strong><span>{allocation.unassignedCents === null ? "Set a total event budget above." : allocation.unassignedCents < 0 ? `${money(-allocation.unassignedCents)} over your total event budget` : `${money(allocation.unassignedCents)} not assigned yet`}</span></div><p className="helper">Planning cost uses your estimates first, then listed starting prices. Suggested budgets are planning allowances, not vendor quotes.</p>{suggestedBudgets.unfilled.length > 0 && <p className="alert" role="status">There is not enough unassigned budget to suggest an amount for every choice. Increase the total or lower an existing category budget.</p>}{recommended.length > 0 && !allCategoriesChosen && <button type="button" className="primary-button" onClick={chooseGroup} disabled={venueTooSmall || (allocation.unassignedCents !== null && allocation.unassignedCents < 0) || suggestedBudgets.unfilled.length > 0}>Add suggested group and budgets</button>}</>}
+        })}</ul><div className="category-budget-total"><strong>Planning cost with this group: {money(Math.round(planningCostTotal * 100))}</strong><span>{unknownPlanningPrices ? `${unknownPlanningPrices} price${unknownPlanningPrices === 1 ? "" : "s"} still unknown` : planningCostTotal > budget ? `${money(Math.round((planningCostTotal - budget) * 100))} over event budget` : `${money(Math.round((budget - planningCostTotal) * 100))} under event budget`}</span></div><div className="category-budget-total"><strong>Assigned category budgets: {money(allocation.assignedCents)}</strong><span>{allocation.unassignedCents === null ? "Set a total event budget above." : allocation.unassignedCents < 0 ? `${money(-allocation.unassignedCents)} over your total event budget` : `${money(allocation.unassignedCents)} not assigned yet`}</span></div><p className="helper">Planning cost uses your estimates first, then listed starting prices. Suggested budgets are planning allowances, not vendor quotes.</p>{suggestedBudgets.unfilled.length > 0 && <p className="alert" role="status">There is not enough unassigned budget to suggest an amount for every choice. Increase the total or lower an existing category budget.</p>}{recommended.length > 0 && !allCategoriesChosen && <button type="button" className="primary-button" onClick={chooseGroup} disabled={venueTooSmall || !groupFitsBudget || (allocation.unassignedCents !== null && allocation.unassignedCents < 0) || suggestedBudgets.unfilled.length > 0}>Add suggested group and budgets</button>}</>}
         <p className="helper">Prefer to decide yourself? <a href="#vendor-search">Browse all vendors below.</a></p>
       </>}
     <VendorDetailsDialog vendor={detailsVendor} onClose={() => setDetailsVendor(null)} />
