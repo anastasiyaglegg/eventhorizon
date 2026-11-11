@@ -9,7 +9,7 @@ const recoverySchema = z.object({ suggestions: z.array(z.object({ issue_id: z.st
 type Planning = z.infer<typeof planningSchema>;
 type Recovery = z.infer<typeof recoverySchema>;
 type Agent = (input: { issues: ScheduleIssue[]; planning?: Planning }, signal?: AbortSignal) => Promise<unknown>;
-const permitted = { missing_slot: ["provide_schedule"], catering_arrival: ["adjust_arrival", "confirm_schedule"], catering_finish: ["adjust_finish", "confirm_schedule"], too_early: ["adjust_arrival", "confirm_schedule"], decor_too_early: ["adjust_arrival", "confirm_schedule"], late_arrival: ["adjust_arrival", "confirm_schedule"] } as const;
+const permitted = { missing_slot: ["provide_schedule"], catering_arrival: ["adjust_arrival", "confirm_schedule"], catering_finish: ["adjust_finish", "confirm_schedule"], needs_early_setup: ["adjust_arrival", "confirm_schedule"], decor_too_early: ["adjust_arrival", "confirm_schedule"], late_arrival: ["adjust_arrival", "confirm_schedule"], ends_before_event: ["adjust_finish", "confirm_schedule"], setup_into_event: ["adjust_finish", "confirm_schedule"] } as const;
 const actionLabels = { provide_schedule: "Enter the vendor's date and time.", adjust_arrival: "Review and adjust the vendor's arrival time.", adjust_finish: "Review and adjust the vendor's finish time.", confirm_schedule: "Confirm the timing with the vendor before making a change." };
 
 function completeIds(items: { issue_id: string }[], issues: ScheduleIssue[]) {
@@ -41,7 +41,7 @@ async function callAgent<T>(role: "planning" | "recovery", payload: { issues: Sc
   const client = new Anthropic({ apiKey, maxRetries: 0, timeout: 90000 });
   const guidance = role === "planning"
     ? "You are the Planning Agent. Return one finding for every supplied issue_id, with normal or high priority. Return no extra or duplicate issue IDs."
-    : "You are the Recovery Agent. Return exactly one suggested action for each supplied issue_id. For missing_slot use provide_schedule. For catering_finish use adjust_finish or confirm_schedule. For other issue codes use adjust_arrival or confirm_schedule.";
+    : "You are the Recovery Agent. Return exactly one suggested action for each supplied issue_id. For missing_slot use provide_schedule. For catering_finish, ends_before_event, or setup_into_event use adjust_finish or confirm_schedule. For other issue codes use adjust_arrival or confirm_schedule.";
   const response = await client.messages.create({ model: process.env.ANTHROPIC_MODEL || "claude-opus-4-6", max_tokens: 16000, thinking: { type: "adaptive" }, output_config: { effort: "medium", format: zodOutputFormat(schema) }, system: `${baseSystem} ${guidance}`, messages: [{ role: "user", content: JSON.stringify(payload) }] }, { signal });
   if (response.stop_reason !== "end_turn") throw new Error("The agent response was incomplete.");
   try { return JSON.parse(response.content.filter(block => block.type === "text").map(block => block.text).join("")) as T; }

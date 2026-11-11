@@ -1,100 +1,96 @@
 # Event Horizon
 
-A three-day prototype that analyzes one vendor arrival change using one Claude
-request, exact time calculations in code, and local approve/reject behavior.
+An event planning prototype for a coordinator and a planning partner. It brings
+themes, vendors, timing, a calendar, a budget snapshot, and AI assisted schedule
+review into one place. Vendor listings are for research; adding a vendor to a
+plan does not make a reservation or send an email.
 
-## Current build
+## What works now
 
-The local implementation provides a Next.js backend and reusable session-state
-functions for Crystal's interface. The homepage is a minimal scaffold. The
-coordinator input and report screens are still to be integrated with her work.
+- Choose from twelve cosmic party themes.
+- Search the connected Supabase vendor directory or clearly labeled example
+  listings; plan vendor dates and times, and track considering/contacted/confirmed.
+- See event and vendor dates on a calendar, add or cancel local events, and read
+  the event run sheet in time order. The calendar also shows three clearly
+  labeled fictional example events with vendor setup times; hide them with one
+  button. Examples never enter a saved plan or its conflict checks.
+- Enter a total budget and one planned spending amount for each vendor category. Missing listing prices stay unknown.
+- Review timing concerns from deterministic checks on Potential conflicts.
+- Use the separate arrival example at `/review` to examine one proposed change
+  and ask the Planning and Recovery agents for next steps. They do not change
+  bookings or contact vendors.
+- Keep a plan on this device. Save & share offers a live shared plan when the
+  migration below is installed, or a clearly labeled copy link when it is not.
 
-- GET /api/event returns the seeded planning.v1 input.
-- POST /api/analyze accepts that input with a proposed arrival time and returns
-  the validated report, calculated setup finish and overlap, and proposed time.
-- After a validated report, the opt-in Recovery Engine at POST /api/recovery makes
-  a separate AI call to propose internal follow-up tasks. It recalculates impact,
-  validates risk indexes, event task IDs, and evidence references, and ties each
-  proposal to both a recovery run ID and its source analysis run ID. Suggestions
-  are not saved, do not modify the event, and cannot contact vendors.
-- src/lib/session.ts implements pending analysis, response receipt, cancellation,
-  approval, and rejection for browser session state.
-- src/server/anthropic.ts makes one server-side Anthropic request per analysis.
-  It uses claude-opus-4-6 with medium effort and disables SDK retries.
-- The server returns explicit input, output, configuration, timeout, and provider
-  errors. Errors block a successful report and leave event data untouched.
+## Suggestions and saved choices
+
+Venue suggestions show at most three choices. The recommendation request keeps
+the chosen venue and selected vendors that are still in the loaded directory, then includes
+up to 15 listings per category. If a selected vendor is missing from the loaded
+directory, the plan still shows its saved choice. You can set its time, remove
+it, or search for a replacement. A search result already in the plan is labeled
+**Already in your plan**.
+
+The category budget is the amount planned for that vendor. It is editable in
+both the suggested group and chosen plan, and the report uses the same amount.
+An amount for an unchosen category guides suggestions; planned spend includes
+it only after that vendor is chosen. Replacing a vendor starts the editable
+amount at the new listing price, or leaves it blank if that price is unknown.
+Listed starting prices appear only
+as comparisons and are not silently added to the total. An unfinished entry,
+such as `500.`, does not count until completed. Older saved vendor estimates
+move into empty category budgets when a plan is opened. The fictional calendar
+examples stay in the event's month and off its date.
 
 ## Run locally
 
-Use Node.js 22 or newer.
+Use Node.js 22 or newer. Run `npm ci`, copy `.env.example` to `.env.local`, and
+set `ANTHROPIC_API_KEY` for AI review. Set `SUPABASE_URL` and
+`SUPABASE_PUBLISHABLE_KEY` to read the real vendor directory and enable shared
+plan storage after the migration. Never put a service-role key in the app.
 
-1. Run npm ci.
-2. Copy .env.example to .env.local and set ANTHROPIC_API_KEY locally.
-3. Run npm run dev.
-4. GET /api/event for the input example. POST that JSON to /api/analyze.
+Run `npm run dev` and open the local URL. Check changes with `npm run typecheck`,
+`npm test`, and `npm run build`. The browser plan is stored locally; no email is
+sent. The optional vendor contact chatbot has not been built.
 
-The selected model is configurable through ANTHROPIC_MODEL. Keep medium effort
-compatible with the configured model. The API key stays on the server.
+## Supabase setup
 
-## Vendor directory
+Apply `supabase/migrations/202611090001_create_vendors.sql` for the vendor
+directory, then add vendor records whose source details you have checked.
+Apply `supabase/migrations/202611100001_create_shared_plans.sql` to turn on live
+shared plans. The second migration creates three restricted functions. The app
+uses a long random link key to load and update a plan; the table itself
+has no direct public access. Anyone with a share link can view and edit that
+plan, so send it only to a planning partner. The app rejects an update if the
+other partner saved a newer version first; use **Get latest** and review before
+saving again. This is a small-team demo, not an account or permission system.
 
-The vendor finder at `/vendors` is a stretch feature, separate from the core P0
-Planning/Readiness demo. Recovery Engine remains the first stretch priority. It uses
-the fictional JSON directory unless both `SUPABASE_URL` and
-`SUPABASE_PUBLISHABLE_KEY` are set in `.env.local`. When configured, `GET /api/vendors`
-reads the public `vendors` table using the publishable key and relies on its row-level
-security policy. Do not put a Supabase service-role key in the app. The expected columns
-are `id`, `name`, `category`, `borough`, `description`,
-`contact_email`, `price_min`, `price_max`, `capacity_min`, `capacity_max`, `rating`, `review_count`,
-`review_summary`, `source_url`, and `is_synthetic`. Prices, capacity, ratings,
-reviews, and availability should remain unknown unless verified.
+Without the second migration, **Save & share** produces a snapshot link. Its
+recipient gets a copy, and later edits do not synchronize. This fallback is
+useful for review but must not be described as live collaboration. Real vendor
+availability, prices, capacity, and ratings remain unknown unless sourced.
 
-Run npm run typecheck, npm test, and npm run build for local verification.
-Provider tests simulate responses. On November 5, 2026, one live Claude Opus 4.6
-medium analysis passed through POST /api/analyze with the team's API key. It returned
-the dependent catering task and the code-calculated 30-minute overlap. The first
-live response failed schema validation; enabling structured JSON output resolved it.
+## Working together
 
-## Handoff to Crystal
+The current branch is `Vantagepoint`. Open feature pull requests into `develop`
+for Crystal's review. Release through a separate `develop` to `main` pull
+request. Do not merge without Anastasiya's explicit approval.
 
-The starting structure follows her November 5 Slack corrections:
-proposed_change is inside snapshot, times use HH:MM:00 or null, and the output
-keeps affected_task_ids, scheduling_risks, unknowns, and recommendation.
-Display only HH:MM in the coordinator interface.
+The PRD is in `docs/PRD.md` and the linked Google Doc. Some newer planning
+features are proposed additions pending the team's review.
 
-The Zod schemas and exported types are in src/lib/contract.ts.
-The revised implementation-aligned schema from Crystal is still pending. This
-implementation is a proposed integration boundary, not a verified integration
-with her unpublished code.
+## Demo order and limits
 
-- event.time_zone is an IANA zone. All entered clock values belong to
-  event.event_date. Setup duration can roll into the following date.
-  Ambiguous/nonexistent daylight-saving times are rejected for clarification.
-- tasks[].depends_on_vendor_ids explicitly records setup dependencies. Code
-  flags only linked tasks whose start precedes setup completion.
-- calculation contains setup_finish (ISO date with offset), overlap_minutes,
-  affected_task_ids, and unknowns. Missing inputs produce null calculations.
-- The response has analysis, calculation, and proposed_arrival_time.
-- Errors preserve her agent/contract_version/status envelope and return an
-  error object with code, message, and details.
-- An analysis action calls beginAnalysis with a unique requestId. Editing the
-  proposed arrival must call clearProposal so a previous response cannot enable
-  approval. Route successful packets through receiveAnalysis and failures
-  through failAnalysis. decide requires review-ready state and applies the
-  arrival only on approval. These helpers are intended for React state.
-- The request ID is a client correlation token. Durable snapshot versions and
-  approval endpoints are outside this local-session implementation. A null
-  proposed arrival can be analyzed and rejected, but decide refuses to approve it.
+Start on the home page to choose a party theme. Use **Search & add** to plan a
+venue and vendors, **Calendar** to see the run sheet, and **Potential conflicts**
+to check timing. On **Arrival and setup**, follow the **open arrival review** link
+to try the PRD's separate proposed-arrival decision. The theme is a saved mood
+choice; it does not change vendor matches or
+scheduling rules. The planning screens are proposed additions awaiting team and
+instructor agreement.
 
-## Scope and collaboration
-
-The authoritative requirements are in docs/PRD.md and its linked Google Doc.
-Separate Readiness and Vendor Follow-up agents, audit history, cost analysis,
-and persisted version checks are stretch work.
-
-Crystal owns her Planning implementation and interface. This change supplies a
-replaceable server adapter and session helpers while her revised schema is
-pending. Compare those contracts before combining the code.
-
-Work locally on Vantagepoint, review PRs into develop, and promote to main only
-after approval. Ask Anastasiya before pushing or opening a PR.
+Dates and times use New York time. The project assumes one event room: two events cannot overlap there, while vendors may work together. Type four time digits such as 1700 and the app shows 17:00. Each recorded vendor or venue window starts
+and ends on one date. That allows a florist to be placed two days before an
+event, but does not yet represent a setup that spans several days or venue
+access across dates. Schedule findings are prompts to confirm details, not proof
+of vendor availability or reservations.

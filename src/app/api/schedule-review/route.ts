@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     catch {
       if (request.signal.aborted) return new Response(null, { status: 499 });
       const fallback = evaluateSchedule(input);
-      return Response.json({ error: process.env.ANTHROPIC_API_KEY ? "Agent review could not finish. Check the rule findings below and try again." : "Add your Anthropic API key to run the agents. The rule findings are shown below.", issues: fallback.issues }, { status: 503, headers: { "Cache-Control": "no-store" } });
+      return Response.json({ error: "AI suggestions are unavailable right now. You can still review the timing findings below.", issues: fallback.issues }, { status: 503, headers: { "Cache-Control": "no-store" } });
     }
   } catch { return Response.json({ error: "The schedule check could not finish." }, { status: 500 }); }
 }

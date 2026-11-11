@@ -168,3 +168,34 @@ Basic checks — require a valid arrival time and a structured response with onl
 Stretch backlog — separate specialist agents, vendor message drafting and copying, stale-version controls, persisted audit records, known-cost calculations, print/export, filters, baseline comparison, and expanded adversarial tests. Prioritize these only after the four P0 capabilities pass the day-3 demo.
 
 Demo checks — (1) 4 PM arrival plus 90-minute setup for a 6 PM event finishes at 5:30 PM and shows no event-start overlap. (2) 5 PM arrival finishes at 6:30 PM and shows a 30-minute overlap. The report identifies only tasks with supplied vendor dependencies. (3) Missing arrival or setup information stays unknown and prompts verification. For each valid case, approve changes the local arrival and reject preserves it. An invalid response or provider failure blocks approval and shows an error.
+
+## 5. Current planning extension for team review (November 11)
+
+The original P0 arrival-change flow above remains the baseline. The current
+branch also offers the coordinator a wider planning path: enter an event budget
+and guest count, review up to three venue suggestions, choose a venue, review a
+vendor group or make selections manually, set dates and times, inspect the
+calendar and conflict findings, then read one planning report. AI suggestions
+never book a vendor or alter the saved plan without the coordinator's action.
+
+The recommendation request includes the chosen venue and current vendor
+choices that are still in the loaded directory before other records. It uses at most 15 listings per service
+and 120 records overall. A selected vendor missing from the loaded directory
+does not disappear from the plan. The coordinator can still set its time,
+remove it, or look for a replacement; the API gives a specific correction
+message if a stale selected ID reaches the server. A listing already chosen is
+identified as such in search results.
+
+The coordinator enters one budget per selected vendor category: the amount
+planned to spend. The same amount appears in the suggested group, chosen plan,
+and report. Planned spend sums budgets for selected vendors; proposed choices
+do not enter the saved total until chosen. Listing prices are
+comparison points and never silently added to that total. A selected vendor
+without a budget is called out, and a budget below a known listed starting
+price prompts a check. An unfinished number such as `500.` does not count.
+Older saved vendor estimates fill empty category budgets when opened. Service
+warnings use the category's readable name. Fictional
+calendar examples remain in the user's event month and do not occupy the
+event's own date. They are never written into the saved plan or its conflict
+checks. These extension behaviors are covered by tests and remain subject to
+team and instructor review.

@@ -10,7 +10,7 @@ export const scheduleReviewInputSchema = z.object({
   vendors: z.array(z.object({ id: z.string().min(1).max(80), name: z.string().min(1).max(200), category: z.enum(["catering", "bakery", "florist", "decorator", "entertainment", "av", "photography"]), slot: slot.nullable() }).strict()).min(1).max(7),
 }).strict();
 export type ScheduleReviewInput = z.infer<typeof scheduleReviewInputSchema>;
-export type ScheduleIssueCode = "missing_slot" | "catering_arrival" | "catering_finish" | "too_early" | "decor_too_early" | "late_arrival";
+export type ScheduleIssueCode = "missing_slot" | "catering_arrival" | "catering_finish" | "needs_early_setup" | "decor_too_early" | "late_arrival" | "ends_before_event" | "setup_into_event";
 export type ScheduleIssue = { id: string; vendorId: string; vendorName: string; code: ScheduleIssueCode; message: string };
 
 function local(date: string, time: string) {
@@ -37,16 +37,21 @@ export function evaluateSchedule(value: unknown): { input: ScheduleReviewInput; 
       if (before < 60 || before > 180) add("catering_arrival", `${vendor.name}: start must be 1–3 hours before the event starts.`);
       if (after < 60 || after > 180) add("catering_finish", `${vendor.name}: finish must be 1–3 hours after the event ends.`);
     } else if (vendor.category === "florist" || vendor.category === "decorator") {
-      if (before > 72 * 60) add("decor_too_early", `${vendor.name}: start is more than 3 days before the event.`);
-    } else if (before > 60) add("too_early", `${vendor.name}: start is more than 1 hour before the event.`);
+      // The agreement is two calendar dates earlier, not a rolling 48-hour window.
+      if (arrival < start.startOf("day").minus({ days: 2 })) add("decor_too_early", `${vendor.name}: start is more than 2 calendar days before the event.`);
+      if (finish > start) add("setup_into_event", `${vendor.name}: the recorded setup continues after the event begins. Confirm that this is intended.`);
+    } else {
+      if (before < 60) add("needs_early_setup", `${vendor.name}: start must be at least 1 hour before the event begins.`);
+      if (finish <= start) add("ends_before_event", `${vendor.name}: the recorded time ends before the event begins. Confirm whether service or equipment is needed during the event.`);
+    }
     // Caterers and bakers are already covered by their 1–3 hour arrival window.
-    if (before < 0 && vendor.category !== "catering" && vendor.category !== "bakery") {
+    if (before < 0 && (vendor.category === "florist" || vendor.category === "decorator")) {
       add("late_arrival", `${vendor.name}: starts after the event begins. Confirm this is intended.`);
     }
   }
   return { input, issues };
 }
 
-export const scheduleIssueSchema = z.object({ id: z.string(), vendorId: z.string(), vendorName: z.string(), code: z.enum(["missing_slot", "catering_arrival", "catering_finish", "too_early", "decor_too_early", "late_arrival"]), message: z.string() }).strict();
+export const scheduleIssueSchema = z.object({ id: z.string(), vendorId: z.string(), vendorName: z.string(), code: z.enum(["missing_slot", "catering_arrival", "catering_finish", "needs_early_setup", "decor_too_early", "late_arrival", "ends_before_event", "setup_into_event"]), message: z.string() }).strict();
 export const scheduleReviewResponseSchema = z.object({ version: z.literal("schedule-review.v1"), run_id: z.string().uuid(), snapshot_hash: z.string().regex(/^[a-f0-9]{64}$/), issues: z.array(scheduleIssueSchema), findings: z.array(z.object({ issue_id: z.string(), priority: z.enum(["normal", "high"]) }).strict()), suggestions: z.array(z.object({ issue_id: z.string(), action: z.enum(["provide_schedule", "adjust_arrival", "adjust_finish", "confirm_schedule"]), text: z.string() }).strict()) }).strict();
 export type ScheduleReviewResponse = z.infer<typeof scheduleReviewResponseSchema>;
