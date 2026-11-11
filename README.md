@@ -11,7 +11,9 @@ plan does not make a reservation or send an email.
 - Search the connected Supabase vendor directory or clearly labeled example
   listings; plan vendor dates and times, and track considering/contacted/confirmed.
 - See event and vendor dates on a calendar, add or cancel local events, and read
-  the event run sheet in time order.
+  the event run sheet in time order. The calendar also shows three clearly
+  labeled fictional example events with vendor setup times; hide them with one
+  button. Examples never enter a saved plan or its conflict checks.
 - Enter a total budget and vendor estimates. Missing prices stay unknown.
 - Review timing concerns. Application code checks the scheduling rules, then the
   Planning and Recovery agents rank concerns and suggest next steps. They do not

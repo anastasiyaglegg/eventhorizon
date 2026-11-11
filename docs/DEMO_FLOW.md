@@ -7,7 +7,7 @@ This is the expanded planning demo. The approved core scenario in `PRD.md` remai
 1. Pick a theme, then enter the event name, total budget, guest count, date, and time.
 2. Review venue suggestions and choose one. The chosen venue becomes part of the saved plan; a suggestion alone does not.
 3. Review a vendor group covering available categories, or browse and select vendors individually. Each suggested vendor gets a planning budget based on its listed starting price and the event's remaining money. A fifth of the spare amount stays unassigned as a cushion. Adding the group fills empty category budgets where the total allows it; existing amounts stay as entered.
-4. Set venue access and vendor work times. See the saved plan on the calendar.
+4. Set venue access and vendor work times. See the saved plan on the calendar. The three fictional example events can make the calendar walkthrough easier; click a day to see each event and its vendor setup times, or hide the examples to show only the saved plan. Examples are not bookings and do not affect the plan's conflict checks.
 5. Review potential time and room conflicts, then the simplified arrival list and final report. From Arrival and setup, open the separate proposed-arrival review to demonstrate the PRD's original decision flow. The coordinator changes times and contacts vendors; the app does not book or email anyone.
 
 ## Function and agent handoffs

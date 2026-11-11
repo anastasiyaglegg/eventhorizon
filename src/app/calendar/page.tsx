@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { DateTime } from "luxon";
 import { serviceLabels, useEventPlan, type Service } from "../../client/event-plan";
+import { calendarExamples } from "../../lib/calendar-examples";
 import { validSchedule, type NamedSchedule, type ScheduleSlot } from "../../lib/schedule-conflicts";
 import { formatTimeEntry } from "../../lib/time-input";
 
@@ -14,13 +15,16 @@ const fromDate = (date: string) => DateTime.fromISO(date, { zone, locale: "en-US
 const today = () => DateTime.now().setZone(zone).setLocale("en-US");
 type CalendarEntry = { id: string; name: string; kind: "event"; slot: ScheduleSlot }
   | { id: string; name: string; kind: "other"; slot: ScheduleSlot }
-  | { id: string; name: string; kind: "vendor"; slot: ScheduleSlot; service: Service };
+  | { id: string; name: string; kind: "vendor"; slot: ScheduleSlot; service: Service }
+  | { id: string; name: string; kind: "example-event"; slot: ScheduleSlot; venue: string }
+  | { id: string; name: string; kind: "example-vendor"; slot: ScheduleSlot; service: Service; eventName: string };
 
 export default function CalendarPage() {
   const { plan, setField, vendors } = useEventPlan();
   // "Today" is chosen in the browser after mount; the static page is built on another day.
   const [month, setMonth] = useState<DateTime | null>(null);
   const [selectedDate, setSelectedDate] = useState("");
+  const [showExamples, setShowExamples] = useState(true);
   useEffect(() => {
     const current = today();
     setMonth(previous => previous ?? current.startOf("month"));
@@ -57,14 +61,18 @@ export default function CalendarPage() {
       result.push({ id, name: vendor?.name ?? `Selected ${serviceLabels[service].toLowerCase()}`, kind: "vendor", service, slot: plan.vendorSlots[id] });
     }
     for (const event of plan.otherEvents) if (validSchedule(event.slot)) result.push({ id: event.id, name: event.name, kind: "other", slot: event.slot });
+    if (showExamples) for (const example of calendarExamples(plan.eventDate)) {
+      result.push({ id: example.id, name: example.name, kind: "example-event", slot: example.slot, venue: example.venue });
+      for (const vendor of example.vendors) result.push({ ...vendor, kind: "example-vendor", eventName: example.name });
+    }
     return result.sort((a, b) => a.slot.date.localeCompare(b.slot.date) || a.slot.start.localeCompare(b.slot.start));
-  }, [plan, vendors]);
+  }, [plan, vendors, showExamples]);
 
   if (!month) return <main className="page-shell workspace-page"><p className="empty-state">Loading your calendar…</p></main>;
   const gridStart = month.startOf("month").minus({ days: month.weekday % 7 });
   const days = Array.from({ length: 42 }, (_, index) => gridStart.plus({ days: index }));
   const selectedEntries = entries.filter(item => item.slot.date === selectedDate);
-  const runSheet = entries.filter(item => item.kind !== "other");
+  const runSheet = entries.filter(item => item.kind === "event" || item.kind === "vendor");
 
   function openDay(date: string) {
     setSelectedDate(date);
@@ -102,10 +110,11 @@ export default function CalendarPage() {
 
   return <main className="page-shell workspace-page">
     <header className="workspace-heading"><div><p className="eyebrow">The whole orbit</p><h1>Visual calendar</h1><p>See your events and vendor setup together. Type four digits for times; the colon appears automatically. Your plan is saved on this device; use Save &amp; share to work with someone else.</p></div><Link className="primary-button" href="/vendors">Search &amp; add vendors →</Link></header>
+    <div className="calendar-example-note"><div><strong>Example schedule · fictional</strong><p>Three events in the same room show different vendor setup times. Examples are for your walkthrough only; they are not bookings and are not saved with your plan.</p></div><button type="button" className="secondary-button" aria-pressed={showExamples} onClick={() => setShowExamples(value => !value)}>{showExamples ? "Hide examples" : "Show examples"}</button></div>
     <div className="calendar-layout">
       <section className="calendar-panel" aria-label="Event calendar">
         <div className="calendar-toolbar"><h2>{month.toLocaleString({ month: "long", year: "numeric" })}</h2><div><button className="calendar-icon-button" type="button" aria-label="Previous month" onClick={() => setMonth(month.minus({ months: 1 }))}>←</button><button className="calendar-icon-button" type="button" onClick={() => { const current = today(); setMonth(current.startOf("month")); setSelectedDate(current.toISODate() ?? ""); }}>Today</button><button className="calendar-icon-button" type="button" aria-label="Next month" onClick={() => setMonth(month.plus({ months: 1 }))}>→</button></div></div>
-        <div className="calendar-grid">{weekdays.map(day => <strong className="calendar-weekday" key={day}>{day}</strong>)}{days.map(day => { const key = day.toISODate() ?? ""; const items = entries.filter(item => item.slot.date === key); return <button type="button" key={key} className={`calendar-day ${day.month === month.month ? "" : "outside"} ${selectedDate === key ? "active" : ""}`} aria-label={`${key}, ${items.length} scheduled items`} aria-pressed={selectedDate === key} onClick={() => openDay(key)}><span>{day.day}</span><span className="calendar-day-items">{items.slice(0, 3).map(item => <small key={`${item.kind}-${item.id}`} className={`calendar-chip ${item.kind}`}>{item.slot.start} {item.name}</small>)}{items.length > 3 && <small className="calendar-more">+{items.length - 3} more</small>}</span></button>; })}</div>
+        <div className="calendar-grid">{weekdays.map(day => <strong className="calendar-weekday" key={day}>{day}</strong>)}{days.map(day => { const key = day.toISODate() ?? ""; const items = entries.filter(item => item.slot.date === key); const exampleCount = items.filter(item => item.kind.startsWith("example-")).length; return <button type="button" key={key} className={`calendar-day ${day.month === month.month ? "" : "outside"} ${selectedDate === key ? "active" : ""}`} aria-label={`${key}, ${items.length} calendar items${exampleCount ? `, ${exampleCount} fictional examples` : ""}`} aria-pressed={selectedDate === key} onClick={() => openDay(key)}><span>{day.day}</span><span className="calendar-day-items">{items.slice(0, 3).map(item => <small key={`${item.kind}-${item.id}`} className={`calendar-chip ${item.kind}`}>{item.kind.startsWith("example-") ? "Example · " : ""}{item.slot.start} {item.name}</small>)}{items.length > 3 && <small className="calendar-more">+{items.length - 3} more</small>}</span></button>; })}</div>
       </section>
       <aside className="calendar-sidebar">
         <section className="panel"><h2>{editingId ? "Edit event" : "Add an event"}</h2><form className="calendar-form" onSubmit={saveOther}><label>Event name<input value={name} maxLength={120} onChange={event => setName(event.target.value)} placeholder="A very good party" /></label><label>Date<input type="date" value={selectedDate} onChange={event => { if (!event.target.value) return; setSelectedDate(event.target.value); setMonth(fromDate(event.target.value).startOf("month")); }} /></label><div className="calendar-time-fields"><label>Start (24h)<input inputMode="numeric" value={start} maxLength={5} placeholder="17:00" onChange={event => setStart(formatTimeEntry(event.target.value))} /></label><label>End (24h)<input inputMode="numeric" value={end} maxLength={5} placeholder="19:00" onChange={event => setEnd(formatTimeEntry(event.target.value))} /></label></div>{error && <p className="alert" role="alert">{error}</p>}<button className="primary-button">{editingId ? "Save changes" : "Add to calendar"}</button>{editingId && <button type="button" className="secondary-button" onClick={() => { setEditingId(null); setName(""); }}>Cancel editing</button>}</form></section>
@@ -114,8 +123,8 @@ export default function CalendarPage() {
     </div>
     <section className="panel run-sheet"><div className="panel-header"><div><p className="eyebrow">Everything in time order</p><h2>Event run sheet</h2></div><Link href="/conflicts">Check timing →</Link></div>{runSheet.length ? <ol className="run-sheet-list">{runSheet.map(item => <li key={`${item.kind}-${item.id}`}><time dateTime={`${item.slot.date}T${item.slot.start}`}>{item.slot.date}<strong>{item.slot.start}–{item.slot.end}</strong></time><div><strong>{item.name}</strong><p>{item.kind === "event" ? "Main event" : "Vendor setup or service"}</p></div></li>)}</ol> : <p className="empty-state">Add an event and vendor times to build your run sheet.</p>}</section>
     <dialog ref={dayDialog} className="calendar-day-dialog" aria-labelledby="calendar-day-title">
-      <div className="calendar-dialog-heading"><div><p className="eyebrow">Your day at a glance</p><h2 id="calendar-day-title">{fromDate(selectedDate).toLocaleString({ weekday: "long", month: "long", day: "numeric", year: "numeric" })}</h2><p>{selectedEntries.length} {selectedEntries.length === 1 ? "scheduled item" : "scheduled items"} · New York time</p></div><button type="button" className="secondary-button" onClick={() => dayDialog.current?.close()}>Close</button></div>
-      {selectedEntries.length ? <ol className="calendar-day-details">{selectedEntries.map(item => <li key={`${item.kind}-${item.id}`}><time dateTime={`${item.slot.date}T${item.slot.start}`}>{item.slot.start}–{item.slot.end}</time><div><strong>{item.name}</strong><p>{item.kind === "event" ? "Main event" : item.kind === "other" ? "Other event" : item.service === "venue" ? "Venue access" : `${serviceLabels[item.service!]} · vendor setup or service`}{item.kind === "vendor" && ` · ${plan.vendorStatuses[item.id] === "confirmed" ? "Confirmed by vendor" : plan.vendorStatuses[item.id] === "contacted" ? "Contacted" : "Considering"}`}</p>{item.kind === "other" && <div className="calendar-dialog-actions"><button type="button" onClick={() => { dayDialog.current?.close(); editOther(item); }}>Edit event</button><button type="button" onClick={() => removeOther(item.id)}>Cancel event</button></div>}</div></li>)}</ol> : <p className="empty-state">Nothing is scheduled for this day yet.</p>}
+      <div className="calendar-dialog-heading"><div><p className="eyebrow">Day at a glance</p><h2 id="calendar-day-title">{fromDate(selectedDate).toLocaleString({ weekday: "long", month: "long", day: "numeric", year: "numeric" })}</h2><p>{selectedEntries.length} {selectedEntries.length === 1 ? "calendar item" : "calendar items"} · New York time</p></div><button type="button" className="secondary-button" onClick={() => dayDialog.current?.close()}>Close</button></div>
+      {selectedEntries.length ? <ol className="calendar-day-details">{selectedEntries.map(item => <li key={`${item.kind}-${item.id}`}><time dateTime={`${item.slot.date}T${item.slot.start}`}>{item.slot.start}–{item.slot.end}</time><div><strong>{item.name}</strong><p>{item.kind === "event" ? "Main event" : item.kind === "other" ? "Other event" : item.kind === "example-event" ? `Example event · ${item.venue} · fictional` : item.kind === "example-vendor" ? `Example ${serviceLabels[item.service]} for ${item.eventName} · fictional` : item.service === "venue" ? "Venue access" : `${serviceLabels[item.service]} · vendor setup or service`}{item.kind === "vendor" && ` · ${plan.vendorStatuses[item.id] === "confirmed" ? "Confirmed by vendor" : plan.vendorStatuses[item.id] === "contacted" ? "Contacted" : "Considering"}`}</p>{item.kind === "other" && <div className="calendar-dialog-actions"><button type="button" onClick={() => { dayDialog.current?.close(); editOther(item); }}>Edit event</button><button type="button" onClick={() => removeOther(item.id)}>Cancel event</button></div>}</div></li>)}</ol> : <p className="empty-state">Nothing is scheduled for this day yet.</p>}
     </dialog>
   </main>;
 }
