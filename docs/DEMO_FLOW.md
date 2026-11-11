@@ -19,7 +19,7 @@ This is the expanded planning demo. The approved core scenario in `PRD.md` remai
 | Vendor group | Chosen venue, category budgets, selected vendors, and directory facts → recommendation agent → checked IDs | At most one per category. The known price or reserved category budget, whichever is larger, counts toward the total. Affordable missing categories may be filled from the same directory snapshot. |
 | Saved plan | Coordinator's choices → browser plan | Suggestions never become selections until the coordinator chooses them. No booking or message is sent. |
 | Timing review | Saved plan → deterministic time rules → Planning Agent → Recovery Agent | Code checks dates, 24-hour times, daylight-saving ambiguity, vendor arrival windows, room overlaps, and access gaps. Agents receive only rule issue IDs; outputs must refer to every supplied issue exactly once and use permitted actions. |
-| Report | Saved plan + deterministic budget and time findings → coordinator | The same category budgets used in the plan are summed as planned spend. Listed prices are comparisons only. Unknown prices and unconfirmed availability stay visible. The report does not assert a real reservation. |
+| Report | Saved plan + deterministic budget and time findings → coordinator | Budgets for chosen vendors are summed as planned spend; suggested vendors are not counted until chosen. Listed prices are comparisons only. Unknown prices and unconfirmed availability stay visible. The report does not assert a real reservation. |
 
 ## Budget example
 

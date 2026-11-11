@@ -33,7 +33,8 @@ it, or search for a replacement. A search result already in the plan is labeled
 
 The category budget is the amount planned for that vendor. It is editable in
 both the suggested group and chosen plan, and the report uses the same amount.
-Planned spend is the sum of those budgets; listed starting prices appear only
+Planned spend is the sum of budgets for selected vendors; a suggestion is not
+counted until chosen. Listed starting prices appear only
 as comparisons and are not silently added to the total. An unfinished entry,
 such as `500.`, does not count until completed. Older saved vendor estimates
 move into empty category budgets when a plan is opened. The fictional calendar

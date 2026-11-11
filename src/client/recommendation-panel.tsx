@@ -75,7 +75,11 @@ export function RecommendationPanel() {
   const budgetChoices = [venue, ...selectedVendorIds.map(id => vendors.find(vendor => vendor.id === id)), ...recommended]
     .filter((vendor): vendor is Vendor => !!vendor).map(vendor => ({ service: vendor.service as Service, priceMin: vendor.priceMin }));
   const suggestedBudgets = suggestCategoryBudgets(plan, budgetChoices);
-  const suggestedSpendCents = Object.values(suggestedBudgets.budgets).reduce<number>((total, amount) => total + (amountCents(amount) ?? 0), 0);
+  const groupServices = new Set<Service>([
+    ...(Object.entries(plan.selections).filter(([, id]) => !!id).map(([service]) => service as Service)),
+    ...recommended.map(vendor => vendor.service as Service),
+  ]);
+  const suggestedSpendCents = [...groupServices].reduce((total, service) => total + (amountCents(suggestedBudgets.budgets[service]) ?? 0), 0);
   const suggestedRemainingCents = cents(budget) - suggestedSpendCents;
   const groupFitsBudget = !!request && (!request.venueId || candidates.some(vendor => vendor.id === request.venueId))
     && committedCents(request, recommended.map(vendor => vendor.id)) <= cents(budget);

@@ -188,7 +188,8 @@ identified as such in search results.
 
 The coordinator enters one budget per selected vendor category: the amount
 planned to spend. The same amount appears in the suggested group, chosen plan,
-and report. Planned spend sums these category budgets; listing prices are
+and report. Planned spend sums budgets for selected vendors; proposed choices
+do not enter the saved total until chosen. Listing prices are
 comparison points and never silently added to that total. A selected vendor
 without a budget is called out, and a budget below a known listed starting
 price prompts a check. An unfinished number such as `500.` does not count.

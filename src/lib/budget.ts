@@ -21,7 +21,8 @@ export function migrateLegacyBudgets<T extends BudgetPlan>(plan: T): T {
 
 /** A category budget is the planned amount to spend; listed prices never enter this total. */
 export function budgetSummary(plan: BudgetPlan) {
-  const plannedCents = Object.values(plan.categoryBudgets ?? {}).reduce<number>((total, amount) => total + (amountCents(amount) ?? 0), 0);
+  const plannedCents = Object.entries(plan.selections).reduce((total, [service, id]) =>
+    total + (id ? amountCents(plan.categoryBudgets?.[service as Service]) ?? 0 : 0), 0);
   const limitCents = amountCents(plan.budgetLimit);
   const unbudgetedCount = Object.entries(plan.selections).filter(([service, id]) => !!id && amountCents(plan.categoryBudgets?.[service as Service]) === null).length;
   return {
@@ -59,7 +60,11 @@ export function buildBudgetFindings(plan: BudgetPlan, vendors: PriceSource[]): B
 export function suggestCategoryBudgets(plan: BudgetPlan, choices: { service: Service; priceMin: number | null }[]) {
   const total = amountCents(plan.budgetLimit);
   const next = { ...plan.categoryBudgets };
-  const assigned = Object.values(next).reduce<number>((sum, value) => sum + (amountCents(value) ?? 0), 0);
+  const activeServices = new Set<Service>([
+    ...Object.entries(plan.selections).filter(([, id]) => !!id).map(([service]) => service as Service),
+    ...choices.map(choice => choice.service),
+  ]);
+  const assigned = [...activeServices].reduce((sum, service) => sum + (amountCents(next[service]) ?? 0), 0);
   const missing = [...new Map(choices.filter(choice => amountCents(next[choice.service]) === null).map(choice => [choice.service, choice])).values()];
   const floors = missing.map(choice => Math.round((choice.priceMin ?? 0) * 100));
   const floorTotal = floors.reduce((sum, value) => sum + value, 0);

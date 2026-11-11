@@ -34,7 +34,23 @@ test("suggested budgets fill empty categories without overwriting a person's amo
   assert.equal(result.budgets.florist, "460.00");
   assert.equal(result.suggested.catering, 96000);
   assert.deepEqual(result.unfilled, []);
-  assert.equal(budgetSummary({ ...plan, categoryBudgets: result.budgets }).remainingCents, 8000);
+  assert.equal(budgetSummary({ ...plan, categoryBudgets: result.budgets }).remainingCents, 150000);
+  assert.equal(budgetSummary({ ...plan, selections: { venue: "v", catering: "c", florist: "f" }, categoryBudgets: result.budgets }).remainingCents, 8000);
+});
+
+test("a category budget is not planned spend until a vendor is selected", () => {
+  const plan = { selections: { venue: "v" }, vendorEstimates: {}, categoryBudgets: { venue: "1000", florist: "600" }, budgetLimit: "2000" };
+  assert.equal(budgetSummary(plan).plannedCents, 100000);
+  assert.equal(budgetSummary(plan).remainingCents, 100000);
+  assert.equal(budgetSummary({ ...plan, selections: { venue: "v", florist: "f" } }).plannedCents, 160000);
+  assert.equal(budgetSummary({ ...plan, selections: { venue: "v", florist: "f" } }).remainingCents, 40000);
+});
+
+test("an unchosen category does not take money from a suggested group", () => {
+  const plan = { selections: { venue: "v" }, vendorEstimates: {}, categoryBudgets: { venue: "1000", florist: "600" }, budgetLimit: "2000" };
+  const suggestion = suggestCategoryBudgets(plan, [{ service: "venue", priceMin: 1000 }, { service: "catering", priceMin: 500 }]);
+  assert.equal(suggestion.budgets.catering, "900.00");
+  assert.deepEqual(suggestion.unfilled, []);
 });
 
 test("unknown listing prices can receive a planning budget when there is room", () => {
