@@ -23,7 +23,7 @@ export function calendarExamples(eventDate: string, now = DateTime.now().setZone
 
   return [
     {
-      id: "example-aurora", name: "Aurora Awards Night", venue: "The Orbit Room", slot: slot(1, "18:00", "21:00"),
+      id: "example-aurora", name: "Venus In Furs", venue: "The Orbit Room", slot: slot(1, "18:00", "21:00"),
       vendors: [
         { id: "example-aurora-catering", name: "Copper Spoon Catering", service: "catering", slot: slot(1, "16:00", "22:00") },
         { id: "example-aurora-av", name: "Prism Sound & Light", service: "av", slot: slot(1, "16:30", "21:00") },
