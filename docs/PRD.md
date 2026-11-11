@@ -2,7 +2,7 @@
 
 Source: https://docs.google.com/document/d/1eqek1tXTcvPv9cgyvkWScJjRMRW4HO3Phi-A7GKCodc
 
-Snapshot of the revised three-day MVP, captured November 5, 2026.
+Status snapshot updated November 11, 2026. The Google Doc is the working PRD. PRs #10 and #11 have merged into develop. PR #13 remains open for review.
 
 Event Horizon — AI EVENT READINESS & TASK AUTOMATION
 
@@ -14,7 +14,7 @@ Development tool — Crystal and Anastasiya use OpenAI Codex to help write, debu
 
 Owners:  Crystal Watson and Anastasiya Glegg
 
-Date: November 5, 2026 — revised for a three-day MVP
+Date: November 10, 2026 — updated to reflect current build and work in review
 
 ## 1. PROBLEM
 
@@ -34,7 +34,7 @@ Help a coordinator assess one vendor arrival change through one AI impact report
 
 #### Market Opportunity
 
-- Three-day scope with a fixed planning budget of 24 team-hours, 12 hours per person. Keep the core flow within this budget and defer stretch work.
+- Original three-day estimate was 24 team-hours. The current working target is approximately 16 hours per person, with additional time possible; prioritize the core flow and reviewed extensions.
 
 - Source role listing: https://job-boards.greenhouse.io/aircallioinc/jobs/4470016009
 
@@ -74,13 +74,13 @@ The Steroid — a 5 PM arrival plus 90-minute setup visibly produces a 6:30 PM f
 
 - Reuse the existing Planning implementation where compatible. Handle readiness observations within the same AI response.
 
-- Deliver the four P0 capabilities listed in section 3 by the end of day 3 within 24 team-hours.
+- Keep the four P0 capabilities in section 3 working while reviewing and integrating the expanded vendor workflow.
 
 #### Non-Goals
 
-- Stretch only — separate Readiness and Vendor Follow-up agents, vendor message drafts, cost analysis, stale-version checks, audit history, multiple events, live integrations, custom event creation, and expanded security or evaluation suites.
+- Outside the current core: a separate Readiness Agent, Vendor Follow-up Agent and message sending, cost analysis, persistent audit history, multiple saved events, and external calendar synchronization. The optional Recovery Agent and vendor workflow are implemented on develop. Local event creation is proposed in PR #13.
 
-- Stretch work begins only after the core flow is complete and reviewed. Any future messaging or integration requires a separate scope decision.
+- The seeded core and vendor extension are on develop. The expanded calendar and theme experience is in PR #13; its assessed scope still needs team and instructor agreement. Messaging and calendar synchronization remain outside the current build.
 
 ### 2d. Success Metrics
 
@@ -89,7 +89,7 @@ The Steroid — a 5 PM arrival plus 90-minute setup visibly produces a 6:30 PM f
 | Useful impact report | Affected dependent tasks and missing facts match the supplied event | Three demo cases and one invalid-response check | Normal, late, and missing-information cases behave as specified. Invalid responses block approval. |
 | Grounded AI recommendations | Suggestions cite event facts and propose a concrete next step | Scenario and evidence review rubric | Every suggestion is traceable to input data; no invented times or costs |
 | Human approval | No local change occurs before explicit approval | Approve and reject checks using local session state | 100%; zero unapproved updates |
-| One-call scope | Each analysis action makes one model request | Count model requests in the demo | One request per analysis action. Additional agents and drafting remain stretch. |
+| Core call scope | The seeded arrival analysis makes one model request | Count model requests in the demo | The seeded arrival analysis uses one call; optional Recovery and the vendor schedule review use separate agent calls. |
 
 ## 3. REQUIREMENTS
 
@@ -111,9 +111,9 @@ One event and one proposed arrival change
 
 Stretch capabilities — outside the day-3 commitment
 
-- Stretch — expanded schedule impact views beyond the single arrival-change report.
+- Expanded vendor schedule analysis merged into develop with PR #10. PR #13 proposes a visual calendar, a conflict view, and revised setup windows.
 
-- Stretch — a separate Readiness Agent and automatically proposed internal follow-up tasks.
+- Recovery follow-up drafts are implemented on develop; a separate Readiness Agent remains deferred.
 
 - [P1] User can inspect the event facts and rule behind each finding.
 
@@ -151,20 +151,40 @@ Sub-journey: Correct a fact and rerun
 
 - [P1] User can see each agent’s role, evidence, unknowns, and any disagreement.
 
+### 3a. Current build and expanded vendor workflow — November 11, 2026
+
+**Status.** The seeded arrival review, optional Recovery follow-up drafts, Vendor Finder, schedule rules, and two-agent review are on `develop` after [PR #10](https://github.com/anastasiyaglegg/eventhorizon/pull/10) merged. [PR #11](https://github.com/anastasiyaglegg/eventhorizon/pull/11) merged into `develop` on November 10 and improved the arrival review screen. [PR #13](https://github.com/anastasiyaglegg/eventhorizon/pull/13) adds a theme-led home page and a shared local calendar/conflict workflow; it remains open for review. Lanice’s approval remains separate.
+
+**Vendor Finder.** A separate page searches a Supabase directory of real businesses by category, name, and borough. Official source links are provided when recorded. Demo prices, capacity, and availability are explicitly fictional and must not be used as verified facts. Contact information and reviews may be missing. The vendor chatbot is on hold until Anastasiya requests it.
+
+**Event plan.** A coordinator selects one venue and vendors, enters the event date, start and end, guest count, and each selected vendor’s date and 24-hour time. The venue and selected vendors appear at the top; vendor scheduling shows other scheduled vendors for this event. Overlapping vendor slots and manually entered events are flagged for human review. Confirm access for a vendor on a different venue date. Selections are session-only; they are not confirmed reservations, and no messages are sent.
+
+**Scheduling rules.** On current `develop`, caterers and bakeries start 1–3 hours before the event starts and finish 1–3 hours after it ends. Florists and decorators can start up to 72 hours before; other vendors can start no more than one hour early. PR #13 proposes the team’s newer rule: florist and decorator setup can occur concurrently up to two days before the event, and other vendors can work concurrently but must start at least one hour before it. These PR #13 changes are not yet merged. Slots and events must each start and end on the same date; overnight support is not implemented. Human confirmation is required for venue access, real prices, and availability.
+
+**Agent handoff.** Code validates the schedule and calculates rule violations. Planning prioritizes those findings; when there are findings, Recovery proposes limited, issue-linked next steps. Outputs and issue references are validated. Edits invalidate pending results. The agents do not approve changes, reserve vendors, or send messages. A live local check found a caterer arriving 30 minutes early and produced a recovery suggestion; broader scenarios and deployed testing remain.
+
+**Next important work.**
+
+1. Review open PR #13, resolve findings, and merge only with Anastasiya’s instruction.
+2. Run the core and vendor flows together from updated `develop`, including normal, boundary, missing-data, and failure cases; verify the connected database and Anthropic configuration without exposing keys.
+3. Decide with the team whether the expanded scope is part of the assessed MVP and submit the revised PRD to Lanice.
+4. Review PR #13’s theme picker, calendar, local event add/cancel, and conflict screen. These plans are saved only in the browser session; they are not external bookings or synchronized calendar events. Notification email was removed from scope at Anastasiya’s request.
+5. Open a separate `develop`-to-`main` PR when the team is ready for release.
+
 ## 4. APPENDIX
 
-Stack — Next.js with TypeScript and React, Next.js server API route, seeded JSON, browser session state, and the Anthropic API using Claude Opus 4.6 (claude-opus-4-6) with medium effort. Codex is the development tool. Anastasiya confirmed on November 5, 2026 that the team has Anthropic API credits and selected Opus with medium effort. Verify a successful live request using those credits before day-1 integration.
+Stack — Next.js with TypeScript and React, Next.js server API routes, seeded JSON, a Supabase vendor directory, browser session state, and the Anthropic API using Claude Opus 4.6 (claude-opus-4-6) with medium effort. Codex is the development tool. Anastasiya confirmed on November 5, 2026 that the team has Anthropic API credits and selected Opus with medium effort. A live local arrival analysis and one vendor schedule handoff have succeeded; deployed-environment verification remains outstanding.
 
-Three-day estimate — 24 team-hours, 12 per person. Day 1: 4 hours each. Crystal prepares the seeded event view and arrival input. Anastasiya defines the single response contract and connects the server route to the provider. Day 2: 4 hours each. Crystal connects exact time arithmetic and the report UI. Anastasiya implements response checks and approve/reject session-state handling. Day 3: 4 hours each. Integrate the full flow, check the three scenarios and invalid-response behavior, fix issues, and prepare the demo. Reuse compatible existing Planning code. Vendor Follow-up and separate Readiness work are deferred.
+Original three-day estimate — 24 team-hours, 12 per person; historical estimate, superseded by the current approximately 16-hours-per-person working target where feasible. Day 1: 4 hours each. Crystal prepares the seeded event view and arrival input. Anastasiya defines the single response contract and connects the server route to the provider. Day 2: 4 hours each. Crystal connects exact time arithmetic and the report UI. Anastasiya implements response checks and approve/reject session-state handling. Day 3: 4 hours each. Integrate the full flow, check the three scenarios and invalid-response behavior, fix issues, and prepare the demo. Reuse compatible existing Planning code. Vendor Follow-up and separate Readiness work are deferred.
 
 Source role — https://job-boards.greenhouse.io/aircallioinc/jobs/4470016009. Evidence currently consists of role duties and the illustrative late-vendor scenario. Add a coordinator conversation only after it occurs.
 
-Single AI call — POST /api/analyze receives the seeded event and proposed arrival. Code calculates setup completion and overlap and passes those results with the event facts to one Planning/Readiness prompt. The response includes affected_task_ids, scheduling_risks, unknowns, and recommendation. Preserve the existing Planning output name scheduling_risks. The UI receives the validated report and calculated time result. Each request ends with a report or error.
+Core arrival analysis — POST /api/analyze receives the seeded event and proposed arrival. Code calculates setup completion and overlap and passes those results with the event facts to one Planning/Readiness prompt. The response includes affected_task_ids, scheduling_risks, unknowns, and recommendation. Preserve the existing Planning output name scheduling_risks. The UI receives the validated report and calculated time result. Each request ends with a report or error.
 
 Local state — one event and one pending proposed arrival in the browser session. Editing the proposed arrival clears the old report and requires fresh analysis. Disable approve/reject while analysis is pending. Approval applies the arrival once and clears the pending proposal. Rejection clears the pending proposal. States are idle, analyzing, review-ready, error, approved, and rejected. Persisted history and version-conflict controls are stretch.
 
 Basic checks — require a valid arrival time and a structured response with only known task references. A failed request or invalid response shows a recoverable error and blocks approval. The user may request analysis again. Keep the API key on the server. Use synthetic event data and treat vendor notes as untrusted input.
 
-Stretch backlog — separate specialist agents, vendor message drafting and copying, stale-version controls, persisted audit records, known-cost calculations, print/export, filters, baseline comparison, and expanded adversarial tests. Prioritize these only after the four P0 capabilities pass the day-3 demo.
+Future backlog — vendor message drafting and copying, persistent event plans and audit records, permission controls, real calendar integration, overnight schedules, known-cost calculations, print/export, and expanded evaluations. The vendor chatbot is on hold. Automatic booking email was removed from scope. Review priorities with Crystal and Lanice.
 
 Demo checks — (1) 4 PM arrival plus 90-minute setup for a 6 PM event finishes at 5:30 PM and shows no event-start overlap. (2) 5 PM arrival finishes at 6:30 PM and shows a 30-minute overlap. The report identifies only tasks with supplied vendor dependencies. (3) Missing arrival or setup information stays unknown and prompts verification. For each valid case, approve changes the local arrival and reject preserves it. An invalid response or provider failure blocks approval and shows an error.
