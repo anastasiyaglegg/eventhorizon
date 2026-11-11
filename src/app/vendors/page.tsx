@@ -3,7 +3,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { findScheduleOverlaps, validSchedule } from "../../lib/schedule-conflicts";
-import { capacityLabel, samplePrice, searchVendors, searchVendorNames, type VendorCriteria, type Vendor } from "../../lib/vendor-search";
+import { capacityLabel, samplePrice, searchVendors, searchVendorNames, type Vendor } from "../../lib/vendor-search";
 import { serviceLabels, useEventPlan, type Service } from "../../client/event-plan";
 import { amountCents, budgetSummary, buildBudgetFindings, money } from "../../lib/budget";
 import { themeName } from "../../lib/event-themes";
@@ -33,7 +33,7 @@ export default function VendorFinder() {
   const budget = budgetSummary(plan);
   const budgetFindings = buildBudgetFindings(plan, vendors);
   const setEventName = setField("name"), setEventDate = setField("eventDate"), setEventStart = setField("eventStart"), setEventEnd = setField("eventEnd"), setEventGuests = setField("eventGuests");
-  const [query, setQuery] = useState("");
+  const [venueRemoved, setVenueRemoved] = useState(false);
   const [detailsVendor, setDetailsVendor] = useState<Vendor | null>(null);
   const detailsButton = (vendor: Vendor) => <button type="button" className="vendor-name-button" onClick={() => setDetailsVendor(vendor)} aria-label={`View contact details for ${vendor.name}`}>{vendor.name}</button>;
   const [nameQuery, setNameQuery] = useState("");
@@ -52,6 +52,7 @@ export default function VendorFinder() {
     slotDialog.current?.close();
   }
   function removeVendor(service: Service, id: string) {
+    if (service === "venue") setVenueRemoved(true);
     setSelections(current => ({ ...current, [service]: undefined }));
     setVendorSlots(current => { const updated = { ...current }; delete updated[id]; return updated; });
     setVendorStatuses(current => { const updated = { ...current }; delete updated[id]; return updated; });
@@ -65,6 +66,7 @@ export default function VendorFinder() {
       const service = vendor.service as Service;
       const previousId = selections[service];
       setSelections(current => ({ ...current, [service]: vendor.id }));
+      if (service === "venue") setVenueRemoved(false);
       if (vendor.priceMin !== null) setCategoryBudgets(current => amountCents(current?.[service]) === null ? { ...current, [service]: vendor.priceMin!.toFixed(2) } : current);
       if (previousId && previousId !== vendor.id) {
         setVendorSlots(current => { const updated = { ...current }; delete updated[previousId]; return updated; });
@@ -73,20 +75,16 @@ export default function VendorFinder() {
     }
     if (!dialogRef.current?.open) dialogRef.current?.showModal();
   }
-  const [criteria, setCriteria] = useState<VendorCriteria>({});
   const [turns, setTurns] = useState<Turn[]>([]);
-  function search(text: string) {
-    const prompt = text.trim();
-    if (!prompt) return;
-    const result = searchVendors(prompt, criteria, vendors);
-    setCriteria(result.criteria);
-    setTurns(current => [...current, { query: prompt, message: result.message, matches: result.matches, possibleMatches: result.possibleMatches }]);
-    setQuery(""); setNameQuery("");
+  function showExample() {
+    const result = searchVendors(example, {}, vendors);
+    setTurns([{ query: example, message: result.message, matches: result.matches, possibleMatches: result.possibleMatches }]);
+    setNameQuery("");
   }
 
   function browseCategory(service: Service) {
     const result = searchVendors(service, {}, vendors);
-    setCriteria(result.criteria); setTurns([{ query: serviceLabels[service], message: result.message, matches: result.matches, possibleMatches: result.possibleMatches }]); setQuery(""); setNameQuery("");
+    setTurns([{ query: serviceLabels[service], message: result.message, matches: result.matches, possibleMatches: result.possibleMatches }]); setNameQuery("");
   }
 
   function showVendorAlternatives(service: Service) {
@@ -101,14 +99,8 @@ export default function VendorFinder() {
     if (name.length < 2) return;
     const found = searchVendorNames(name, vendors);
     const message = found.length === 0 ? `No vendors found with “${name}” in their name.` : `Found ${found.length} ${found.length === 1 ? "vendor" : "vendors"} matching “${name}”.`;
-    setCriteria({});
     setTurns([{ query: name, message, matches: found, possibleMatches: [] }]);
-    setNameQuery(""); setQuery("");
-  }
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    search(query);
+    setNameQuery("");
   }
 
   return (
@@ -131,7 +123,7 @@ export default function VendorFinder() {
         <div className="booking-fields"><label className="field">Total budget ($) <input inputMode="decimal" placeholder="Set a budget" value={budgetLimit} onChange={event => { if (/^$|^\d{1,9}(?:\.\d{0,2})?$/.test(event.target.value)) setBudgetLimit(event.target.value); }} /></label><label className="field">Planned number of guests <input type="number" min="1" step="1" value={eventGuests} onChange={e => setEventGuests(e.target.value)} /></label><label className="field">Event date <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} /></label><label className="field">Event start (24-hour; type 1800) <input inputMode="numeric" value={eventStart} placeholder="1800" maxLength={5} onChange={e => setEventStart(formatTimeEntry(e.target.value))} /></label><label className="field">Event end (24-hour; type 2000) <input inputMode="numeric" value={eventEnd} placeholder="2000" maxLength={5} onChange={e => setEventEnd(formatTimeEntry(e.target.value))} /></label></div>
         <RecommendationPanel />
         <div className="chosen-plan"><div className="chosen-plan-heading"><span className="chosen-plan-label">Your plan</span><h3>Your chosen vendors</h3><p>Only these selections are in your event plan. Suggestions above are optional until you add them.</p></div>
-        {!selections.venue && <p className="booking-missing">Venue not selected</p>}
+        {!selections.venue && <p className="alert" role={venueRemoved ? "status" : "alert"}>{venueRemoved ? "Venue removed. Choose a replacement venue before continuing." : "A venue is required. Choose one before continuing."}</p>}
         <ul className="planned-list">{plannedVendors.map(({ service, id, name: selectedName, vendor }) => {
           const label = serviceLabels[service];
           const slot = vendorSlots[id];
@@ -169,10 +161,11 @@ export default function VendorFinder() {
           </label>
           <button className="primary-button" disabled={nameQuery.trim().length < 2}>Search by name</button>
         </form>
-        <button className="secondary-button vendor-example" type="button" onClick={() => search(example)}>
+        <button className="secondary-button vendor-example" type="button" onClick={showExample}>
           {example}
         </button>
         <div id="vendor-results" role="log" aria-label="Vendor search conversation">
+          {venueRemoved && !selections.venue && <p className="alert" role="alert">Venue removed. Choose a replacement venue from the options below before continuing.</p>}
           {turns.map((turn, index) => (
             <div className="vendor-turn" key={index}>
               <p><strong>You:</strong> {turn.query}</p>
@@ -202,20 +195,8 @@ export default function VendorFinder() {
             </div>
           ))}
         </div>
-        <form className="vendor-form" onSubmit={submit}>
-          <label className="field">
-            Your vendor request
-            <input value={query} onChange={event => setQuery(event.target.value)} maxLength={300}
-              placeholder={turns.length ? "Try a different borough or budget" : "Describe the vendor you need"} />
-          </label>
-          <div className="decision-row">
-            <button className="primary-button" disabled={!query.trim()}>Find vendors</button>
-            <button className="secondary-button" type="button" disabled={!turns.length}
-              onClick={() => { setTurns([]); setCriteria({}); setQuery(""); setNameQuery(""); }}>New search</button>
-          </div>
-        </form>
       </section>
-      <div className="journey-next"><Link className="primary-button" href="/calendar">Next: view calendar →</Link></div>
+      <div className="journey-next">{selections.venue ? <Link className="primary-button" href="/calendar">Next: view calendar →</Link> : <button className="primary-button" type="button" disabled title="Choose a venue to continue">Next: view calendar →</button>}</div>
       <dialog ref={dialogRef} className="booking-dialog" aria-labelledby="booking-title">
         <div className="booking-heading"><div><p className="eyebrow">Event Horizon · Vendor plan</p><h2 id="booking-title">{eventName || "Name your event"}</h2><p className="event-theme">Theme: {selectedTheme ?? "Not chosen yet"}</p></div><button type="button" className="secondary-button" onClick={() => dialogRef.current?.close()}>Close</button></div>
         <p className="helper">These are planning choices. Contact each business to confirm a reservation.</p>
