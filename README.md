@@ -15,10 +15,10 @@ plan does not make a reservation or send an email.
   labeled fictional example events with vendor setup times; hide them with one
   button. Examples never enter a saved plan or its conflict checks.
 - Enter a total budget and one planned spending amount for each vendor category. Missing listing prices stay unknown.
-- Review timing concerns. Application code checks the scheduling rules, then the
-  Planning and Recovery agents rank concerns and suggest next steps. They do not
-  change bookings or contact vendors.
-- Use the separate arrival example at `/review` to examine one proposed change.
+- Review timing concerns from deterministic checks on Potential conflicts.
+- Use the separate arrival example at `/review` to examine one proposed change
+  and ask the Planning and Recovery agents for next steps. They do not change
+  bookings or contact vendors.
 - Keep a plan on this device. Save & share offers a live shared plan when the
   migration below is installed, or a clearly labeled copy link when it is not.
 
