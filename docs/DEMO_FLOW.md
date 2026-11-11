@@ -16,7 +16,7 @@ This is the expanded planning demo. The approved core scenario in `PRD.md` remai
 | --- | --- | --- |
 | Event details | Coordinator → recommendation request | Positive budget and guest count; up to 120 directory candidates. |
 | Venue shortlist | Directory facts → recommendation agent → checked IDs | Venue capacity and known starting price fit the stated guests and budget. Only supplied IDs are accepted. |
-| Vendor group | Chosen venue, category budgets, selected vendors, and directory facts → recommendation agent → checked IDs | At most one per category. The known price or reserved category budget, whichever is larger, counts toward the total. Affordable missing categories may be filled from the same directory snapshot. |
+| Vendor group | Chosen venue, category budgets, selected vendors, and directory facts → recommendation agent → checked IDs | At most one per category. The known price or category budget, whichever is larger, counts toward the total for selected and proposed vendors. A budget for an unchosen category only guides suggestions. Affordable missing categories may be filled from the same directory snapshot. |
 | Saved plan | Coordinator's choices → browser plan | Suggestions never become selections until the coordinator chooses them. No booking or message is sent. |
 | Potential conflicts | Saved plan → deterministic time rules → coordinator | Code checks dates, 24-hour times, daylight-saving ambiguity, vendor arrival windows, room overlaps, and access gaps. No AI action is shown on this page. |
 | Separate arrival review | Proposed arrival → deterministic overlap calculation → Planning Agent → Recovery Agent → coordinator | Agents receive only validated issue IDs; their suggestions do not apply a change without the coordinator's approval. |
@@ -24,7 +24,7 @@ This is the expanded planning demo. The approved core scenario in `PRD.md` remai
 
 ## Budget example
 
-With a $5,000 event budget, a $2,000 venue budget and $1,000 photography budget leave $2,000 for other planned spending. A caterer listing that starts at $2,100 needs a larger category budget or a different choice. If the coordinator changes the venue budget to $2,300, both the chosen plan and report show $2,300, and the remaining amount becomes $1,700. A category budget below a listed starting price or a total overrun appears as a finding. A listing price is not a confirmed quote.
+With a $5,000 event budget, a $2,000 chosen venue budget and $1,000 chosen photography budget leave $2,000 for other planned spending. A caterer listing that starts at $2,100 needs a larger category budget or a different choice. If the coordinator changes the venue budget to $2,300, both the chosen plan and report show $2,300, and the remaining amount becomes $1,700. A category budget below a listed starting price or a total overrun appears as a finding. A listing price is not a confirmed quote.
 
 ## Time example
 

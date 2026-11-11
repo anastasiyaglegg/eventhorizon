@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { EventPlanProvider } from "../client/event-plan";
 import { PlanActions } from "../client/plan-actions";
+import { VenueRequiredNotice } from "../client/venue-required-notice";
 import "./globals.css";
 
 export const metadata = { title: "Event Horizon" };
@@ -18,6 +19,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </div>
       <PlanActions />
     </nav>
+    <VenueRequiredNotice />
     {children}
   </EventPlanProvider></body></html>;
 }

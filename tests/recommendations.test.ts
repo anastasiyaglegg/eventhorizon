@@ -23,6 +23,12 @@ test("venue suggestions exclude listings that cannot fit the guests or budget", 
   assert.match(result.snapshot_hash, /^[a-f0-9]{64}$/);
 });
 
+test("a venue budget left behind without a venue cannot hide larger suitable venues", async () => {
+  const venues = [item("small", "venue", 2100, 160), item("large", "venue", 5200, 300)];
+  const result = await recommend({ phase: "venue", budget: 50000, guests: 200, categoryBudgets: { venue: 2100 }, candidates: venues });
+  assert.deepEqual(result.ids, ["large"]);
+});
+
 test("server caps an AI venue shortlist at three", async () => {
   const venues = Array.from({ length: 4 }, (_, index) => item(`venue-${index}`, "venue", 1000, 100));
   const result = await recommend({ phase: "venue", budget: 5000, guests: 80, candidates: venues }, async () => ({ ids: venues.map(venue => venue.id) }));
@@ -104,18 +110,23 @@ test("venue borough and category budgets shape the vendor group", async () => {
   assert.deepEqual(capped.ids, ["florist-far"]);
 });
 
-test("existing vendors and category allocations are included in budget checks", async () => {
+test("existing vendors and proposed category budgets are included when a listing is chosen", async () => {
   const group = [item("venue", "venue", 1000, 100), item("already", "photography", 900, 100), item("florist", "florist", 500, 100)];
   await assert.rejects(recommend({ phase: "vendors", budget: 2000, guests: 80, venueId: "venue", selectedServices: ["photography"], selectedVendorIds: ["already"], candidates: group }), /No directory listings/);
-  await assert.rejects(recommend({ phase: "vendors", budget: 2000, guests: 80, venueId: "venue", categoryBudgets: { venue: 1500, florist: 700 }, candidates: group }), /Assigned vendor budgets/);
+  await assert.rejects(recommend({ phase: "vendors", budget: 2000, guests: 80, venueId: "venue", categoryBudgets: { venue: 1500, florist: 700 }, candidates: group }), /No directory listings/);
 });
 
-test("money reserved for other categories cannot be spent by a suggested group", async () => {
+test("an unchosen category budget does not reduce spend until that category joins the group", async () => {
   const listings = [item("venue", "venue", 1000, 100), item("catering", "catering", 1800, 100), item("florist", "florist", 200, 100)];
   const request: RecommendationInput = { phase: "vendors", budget: 3000, guests: 80, venueId: "venue", categoryBudgets: { venue: 1000, photography: 1000 }, candidates: listings };
   const result = await recommend(request);
-  assert.deepEqual(result.ids, ["florist"]);
+  assert.deepEqual(result.ids, ["catering", "florist"]);
   await recommend(request, async ({ availableBudget, candidates: pool }) => {
+    assert.equal(availableBudget, 2000);
+    assert.deepEqual(pool.map(candidate => candidate.id), ["florist", "catering"]);
+    return { ids: ["florist"] };
+  });
+  await recommend({ ...request, selectedServices: ["photography"] }, async ({ availableBudget, candidates: pool }) => {
     assert.equal(availableBudget, 1000);
     assert.deepEqual(pool.map(candidate => candidate.id), ["florist"]);
     return { ids: ["florist"] };

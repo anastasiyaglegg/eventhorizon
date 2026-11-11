@@ -24,6 +24,7 @@ type ShareResult = { link: string; live: boolean };
 
 type PlanContextValue = {
   plan: EventPlan;
+  hydrated: boolean;
   setField: <K extends keyof EventPlan>(key: K) => Dispatch<SetStateAction<EventPlan[K]>>;
   resetPlan: () => void;
   shared: boolean;
@@ -219,7 +220,7 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <PlanContext.Provider value={{ plan, setField, resetPlan: () => { saveRevision.current.reset(); setPlan(emptyPlan); setShared(null); setDraftKey(storageKey); setUnsavedChanges(false); sessionStorage.removeItem(sharedStorageKey); sessionStorage.removeItem(dirtySharedKey); history.replaceState(null, "", location.pathname); }, shared: !!shared, unsavedChanges, sharedLoadError, saveAndShare, refreshShared, vendors, directoryReady, directorySource, directoryWarning, directoryError }}>{children}</PlanContext.Provider>;
+  return <PlanContext.Provider value={{ plan, hydrated, setField, resetPlan: () => { saveRevision.current.reset(); setPlan(emptyPlan); setShared(null); setDraftKey(storageKey); setUnsavedChanges(false); sessionStorage.removeItem(sharedStorageKey); sessionStorage.removeItem(dirtySharedKey); history.replaceState(null, "", location.pathname); }, shared: !!shared, unsavedChanges, sharedLoadError, saveAndShare, refreshShared, vendors, directoryReady, directorySource, directoryWarning, directoryError }}>{children}</PlanContext.Provider>;
 }
 
 export function useEventPlan() {

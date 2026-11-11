@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { amountCents, budgetSummary, buildBudgetFindings, migrateLegacyBudgets, suggestCategoryBudgets } from "../src/lib/budget";
+import { amountCents, budgetAfterVendorChoice, budgetSummary, buildBudgetFindings, migrateLegacyBudgets, suggestCategoryBudgets } from "../src/lib/budget";
+
+test("replacing a vendor resets its budget while a first choice keeps an entered amount", () => {
+  assert.equal(budgetAfterVendorChoice("2100", "old-venue", "new-venue", 5200), "5200.00");
+  assert.equal(budgetAfterVendorChoice("2100", "old-venue", "new-venue", null), "");
+  assert.equal(budgetAfterVendorChoice("2500", undefined, "new-venue", 5200), "2500");
+  assert.equal(budgetAfterVendorChoice(undefined, undefined, "new-venue", 5200), "5200.00");
+});
 
 test("category budgets alone determine planned spend and remaining money", () => {
   const plan = {

@@ -101,7 +101,27 @@ export function RecommendationPanel() {
   function chooseVenue(id: string) {
     setField("selections")(current => ({ ...current, venue: id }));
     const listed = vendors.find(vendor => vendor.id === id)?.priceMin;
-    if (listed !== null && listed !== undefined) setField("categoryBudgets")(current => amountCents(current?.venue) === null ? { ...current, venue: listed.toFixed(2) } : current);
+    setField("categoryBudgets")(current => ({ ...current, venue: listed === null || listed === undefined ? "" : listed.toFixed(2) }));
+  }
+  function seeVenuesThatFit() {
+    const oldVenueId = plan.selections.venue;
+    if (!oldVenueId) return;
+    setField("selections")(current => ({ ...current, venue: undefined }));
+    setField("categoryBudgets")(current => {
+      const next = { ...current };
+      delete next.venue;
+      return next;
+    });
+    setField("vendorSlots")(current => {
+      const next = { ...current };
+      delete next[oldVenueId];
+      return next;
+    });
+    setField("vendorStatuses")(current => {
+      const next = { ...current };
+      delete next[oldVenueId];
+      return next;
+    });
   }
   function chooseGroup() {
     if (!groupFitsBudget) return;
@@ -120,7 +140,7 @@ export function RecommendationPanel() {
     <div className="panel-header"><div><p className="eyebrow">{phase === "venue" ? "Next: choose a place" : "Next: choose your team"}</p><h3 id="recommendation-title">{phase === "venue" ? "Venues for your event" : "A vendor group to consider"}</h3></div></div>
     {!ready ? <p className="helper">{directoryReady ? "Enter your budget and guest count above to see suggestions." : "Loading vendor choices…"}</p>
       : <>
-        {venueTooSmall && <div className="alert" role="alert"><p>Your selected venue lists room for {venue?.capacityMax} guests, fewer than the {guests} guests planned. Choose a larger venue or change the guest count before adding a suggested group.</p><button type="button" className="secondary-button" onClick={() => setField("selections")(current => ({ ...current, venue: undefined }))}>See venues that fit</button></div>}
+        {venueTooSmall && <div className="alert" role="alert"><p>Your selected venue lists room for {venue?.capacityMax} guests, fewer than the {guests} guests planned. Choose a larger venue or change the guest count before adding a suggested group.</p><button type="button" className="secondary-button" onClick={seeVenuesThatFit}>See venues that fit</button></div>}
         {allCategoriesChosen ? <p className="helper">All seven vendor categories are already in your plan.</p>
           : searching ? <p role="status">Finding options from the vendor directory…</p>
           : error?.key === key && !venueTooSmall ? <div className="alert" role="alert"><p>{error.message}</p><button type="button" className="secondary-button" onClick={() => { setError(null); setRetryCount(count => count + 1); }}>Try again</button></div>
@@ -140,7 +160,7 @@ export function RecommendationPanel() {
             })}
           </ul>
           <div className="category-budget-total"><strong>Planned spend with this group: {money(suggestedSpendCents)}</strong><span>{suggestedRemainingCents < 0 ? `${money(-suggestedRemainingCents)} over event budget` : `${money(suggestedRemainingCents)} remaining`}</span></div>
-          <p className="helper">Each category budget is the amount you plan to spend. Suggested amounts are editable and do not confirm a vendor’s price.</p>
+          <p className="helper">A budget for a vendor you have not chosen guides suggestions. It joins planned spend when you add that vendor. These amounts are editable and do not confirm a price.</p>
           {suggestedBudgets.unfilled.length > 0 && <p className="alert" role="status">There is not enough room in the event budget to suggest an amount for every choice. Increase the total or lower another category budget.</p>}
           {recommended.length > 0 && !allCategoriesChosen && <button type="button" className="primary-button" onClick={chooseGroup} disabled={venueTooSmall || !groupFitsBudget || (allocation.remainingCents !== null && allocation.remainingCents < 0) || suggestedRemainingCents < 0 || suggestedBudgets.unfilled.length > 0}>Add suggested group and budgets</button>}
         </>}

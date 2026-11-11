@@ -7,6 +7,13 @@ type PriceSource = Pick<Vendor, "id" | "priceMin">;
 type Service = keyof typeof serviceLabels;
 export const amountCents = (value: string | undefined) => value && /^\d{1,9}(?:\.\d{1,2})?$/.test(value) ? Math.round(Number(value) * 100) : null;
 
+/** A new listing starts with its listed price; replacing a listing must not inherit the old plan amount. */
+export function budgetAfterVendorChoice(current: string | undefined, previousId: string | undefined, nextId: string, listedPrice: number | null) {
+  if (previousId && previousId !== nextId) return listedPrice === null ? "" : listedPrice.toFixed(2);
+  if (amountCents(current) === null && listedPrice !== null) return listedPrice.toFixed(2);
+  return current;
+}
+
 /** Keep old saved amounts when moving from separate estimates to one budget per category. */
 export function migrateLegacyBudgets<T extends BudgetPlan>(plan: T): T {
   if (!Object.keys(plan.vendorEstimates).length) return plan;

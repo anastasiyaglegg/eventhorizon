@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { findScheduleOverlaps, validSchedule } from "../../lib/schedule-conflicts";
 import { capacityLabel, samplePrice, searchVendors, searchVendorNames, type Vendor } from "../../lib/vendor-search";
 import { serviceLabels, useEventPlan, type Service } from "../../client/event-plan";
-import { amountCents, budgetSummary, buildBudgetFindings, money } from "../../lib/budget";
+import { budgetAfterVendorChoice, budgetSummary, buildBudgetFindings, money } from "../../lib/budget";
 import { themeName } from "../../lib/event-themes";
 import { formatTimeEntry } from "../../lib/time-input";
 import { RecommendationPanel } from "../../client/recommendation-panel";
@@ -23,7 +23,7 @@ type EventPlanStatus = "considering" | "contacted" | "confirmed";
 type Turn = { query: string; message: string; matches: Vendor[]; possibleMatches: Vendor[] };
 
 export default function VendorFinder() {
-  const { plan, setField, vendors, directorySource, directoryWarning, directoryError } = useEventPlan();
+  const { plan, hydrated, setField, vendors, directorySource, directoryWarning, directoryError } = useEventPlan();
   const { name, themeId, selections, vendorSlots, vendorStatuses, categoryBudgets, budgetLimit, otherEvents, eventDate, eventStart, eventEnd, eventGuests } = plan;
   const eventName = name.trim();
   const selectedTheme = themeName(themeId);
@@ -34,6 +34,7 @@ export default function VendorFinder() {
   const budgetFindings = buildBudgetFindings(plan, vendors);
   const setEventName = setField("name"), setEventDate = setField("eventDate"), setEventStart = setField("eventStart"), setEventEnd = setField("eventEnd"), setEventGuests = setField("eventGuests");
   const [venueRemoved, setVenueRemoved] = useState(false);
+  useEffect(() => { if (selections.venue) setVenueRemoved(false); }, [selections.venue]);
   const [detailsVendor, setDetailsVendor] = useState<Vendor | null>(null);
   const detailsButton = (vendor: Vendor) => <button type="button" className="vendor-name-button" onClick={() => setDetailsVendor(vendor)} aria-label={`View contact details for ${vendor.name}`}>{vendor.name}</button>;
   const [nameQuery, setNameQuery] = useState("");
@@ -67,7 +68,10 @@ export default function VendorFinder() {
       const previousId = selections[service];
       setSelections(current => ({ ...current, [service]: vendor.id }));
       if (service === "venue") setVenueRemoved(false);
-      if (vendor.priceMin !== null) setCategoryBudgets(current => amountCents(current?.[service]) === null ? { ...current, [service]: vendor.priceMin!.toFixed(2) } : current);
+      setCategoryBudgets(current => {
+        const amount = budgetAfterVendorChoice(current?.[service], previousId, vendor.id, vendor.priceMin);
+        return amount === undefined ? current : { ...current, [service]: amount };
+      });
       if (previousId && previousId !== vendor.id) {
         setVendorSlots(current => { const updated = { ...current }; delete updated[previousId]; return updated; });
         setVendorStatuses(current => { const updated = { ...current }; delete updated[previousId]; return updated; });
@@ -123,7 +127,9 @@ export default function VendorFinder() {
         <div className="booking-fields"><label className="field">Total budget ($) <input inputMode="decimal" placeholder="Set a budget" value={budgetLimit} onChange={event => { if (/^$|^\d{1,9}(?:\.\d{0,2})?$/.test(event.target.value)) setBudgetLimit(event.target.value); }} /></label><label className="field">Planned number of guests <input type="number" min="1" step="1" value={eventGuests} onChange={e => setEventGuests(e.target.value)} /></label><label className="field">Event date <input type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} /></label><label className="field">Event start (24-hour; type 1800) <input inputMode="numeric" value={eventStart} placeholder="1800" maxLength={5} onChange={e => setEventStart(formatTimeEntry(e.target.value))} /></label><label className="field">Event end (24-hour; type 2000) <input inputMode="numeric" value={eventEnd} placeholder="2000" maxLength={5} onChange={e => setEventEnd(formatTimeEntry(e.target.value))} /></label></div>
         <RecommendationPanel />
         <div className="chosen-plan"><div className="chosen-plan-heading"><span className="chosen-plan-label">Your plan</span><h3>Your chosen vendors</h3><p>Only these selections are in your event plan. Suggestions above are optional until you add them.</p></div>
-        {!selections.venue && <p className="alert" role={venueRemoved ? "status" : "alert"}>{venueRemoved ? "Venue removed. Choose a replacement venue before continuing." : "A venue is required. Choose one before continuing."}</p>}
+        {hydrated && !selections.venue && (venueRemoved
+          ? <p className="booking-missing">Venue removed. Choose a replacement venue before continuing.</p>
+          : <p className="alert" role="alert">A venue is required. Choose one before continuing.</p>)}
         <ul className="planned-list">{plannedVendors.map(({ service, id, name: selectedName, vendor }) => {
           const label = serviceLabels[service];
           const slot = vendorSlots[id];
@@ -143,7 +149,7 @@ export default function VendorFinder() {
             <label>Budget for {label} ($)<input aria-label={`${selectedName} budget`} inputMode="decimal" placeholder="Set planned amount" value={categoryBudgets?.[service] ?? ""} onChange={event => { if (/^$|^\d{1,8}(?:\.\d{0,2})?$/.test(event.target.value)) setCategoryBudgets(current => ({ ...current, [service]: event.target.value })); }} /></label>
           </div><div className="decision-row"><button type="button" className="secondary-button" onClick={() => openSlot(id, selectedName, slot)}>Set date and time</button><button type="button" className="secondary-button" aria-label={`Remove ${selectedName}`} onClick={() => removeVendor(service, id)}>Remove</button><button type="button" className="secondary-button" aria-label={`Replace ${selectedName}`} onClick={() => showVendorAlternatives(service)}>Replace</button></div></li>;
         })}</ul>
-        <section className="budget-snapshot" aria-label="Budget snapshot"><div><h3>Budget snapshot</h3><p className="helper">Your category budgets are the amounts you plan to spend. Listed prices are for comparison and still need confirmation.</p></div><div className="budget-numbers"><div><span>Planned spend</span><strong>{money(budget.plannedCents)}</strong></div><div><span>{budget.remainingCents !== null && budget.remainingCents < 0 ? "Over budget" : "Remaining"}</span><strong>{budget.remainingCents === null ? "Set a budget" : money(Math.abs(budget.remainingCents))}</strong></div><div><span>Vendors without a budget</span><strong>{budget.unbudgetedCount}</strong></div></div>{budgetFindings.filter(item => item.tone === "needs-action").map(item => <p className="booking-conflict" key={item.id}>{item.detail}</p>)}</section></div>
+        <section className="budget-snapshot" aria-label="Budget snapshot"><div><h3>Budget snapshot</h3><p className="helper">Only chosen vendors count in planned spend. Listed prices are for comparison and still need confirmation.</p></div><div className="budget-numbers"><div><span>Planned spend</span><strong>{money(budget.plannedCents)}</strong></div><div><span>{budget.remainingCents !== null && budget.remainingCents < 0 ? "Over budget" : "Remaining"}</span><strong>{budget.remainingCents === null ? "Set a budget" : money(Math.abs(budget.remainingCents))}</strong></div><div><span>Vendors without a budget</span><strong>{budget.unbudgetedCount}</strong></div></div>{budgetFindings.map(item => <p className={item.tone === "needs-action" ? "booking-conflict" : "helper"} key={item.id}>{item.detail}</p>)}</section></div>
       </section>
       <section className="panel" id="vendor-search" aria-labelledby="search-heading">
         <h2 id="search-heading">What do you need for your event?</h2>
@@ -165,7 +171,7 @@ export default function VendorFinder() {
           {example}
         </button>
         <div id="vendor-results" role="log" aria-label="Vendor search conversation">
-          {venueRemoved && !selections.venue && <p className="alert" role="alert">Venue removed. Choose a replacement venue from the options below before continuing.</p>}
+          {hydrated && venueRemoved && !selections.venue && <p className="alert" role="alert">Venue removed. Choose a replacement venue from the options below before continuing.</p>}
           {turns.map((turn, index) => (
             <div className="vendor-turn" key={index}>
               <p><strong>You:</strong> {turn.query}</p>

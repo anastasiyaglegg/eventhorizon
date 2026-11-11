@@ -85,6 +85,7 @@ p { line-height: 1.55; }
 .evidence-item { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; margin-top: 5px; }
 .empty-state { color: var(--muted); background: var(--soft); border-radius: 10px; padding: 14px; }
 .alert { color: var(--red); background: var(--red-soft); border: 1px solid #f0b8ba; border-radius: 10px; padding: 13px 14px; margin-top: 14px; }
+.venue-required-notice { max-width: 1200px; margin: 14px auto 0; }
 .success { color: var(--green); background: var(--green-soft); border: 1px solid #b8e3c9; border-radius: 10px; padding: 13px 14px; margin-top: 14px; }
 .decision-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 .footnote { color: var(--muted); font-size: 0.84rem; margin: 12px 0 0; }

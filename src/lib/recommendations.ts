@@ -73,13 +73,27 @@ function fit(candidate: RecommendationCandidate, guests: number, budget: number,
 
 export const cents = (amount: number) => Math.round(amount * 100);
 
-/** A category's reservation and its known selected price are one commitment, whichever is larger. */
-export function committedCents(input: RecommendationInput, choiceIds: string[] = []) {
-  const byService = new Map<string, number>(Object.entries(input.categoryBudgets ?? {}).map(([service, amount]) => [service, cents(amount ?? 0)]));
+function committedServices(input: RecommendationInput, choiceIds: string[] = []) {
+  const services = new Set<RecommendationCandidate["service"]>(input.selectedServices ?? []);
+  if (input.venueId) services.add("venue");
   for (const id of [input.venueId, ...(input.selectedVendorIds ?? []), ...choiceIds]) {
     if (!id) continue;
     const listing = input.candidates.find(item => item.id === id);
     if (!listing) throw new Error("A selected listing is missing from the directory snapshot.");
+    services.add(listing.service);
+  }
+  return services;
+}
+
+/** Only selected or proposed vendors commit their category budget and known starting price. */
+export function committedCents(input: RecommendationInput, choiceIds: string[] = []) {
+  const services = committedServices(input, choiceIds);
+  const byService = new Map<string, number>(Object.entries(input.categoryBudgets ?? {})
+    .filter(([service]) => services.has(service as RecommendationCandidate["service"]))
+    .map(([service, amount]) => [service, cents(amount ?? 0)]));
+  for (const id of [input.venueId, ...(input.selectedVendorIds ?? []), ...choiceIds]) {
+    if (!id) continue;
+    const listing = input.candidates.find(item => item.id === id)!;
     byService.set(listing.service, Math.max(byService.get(listing.service) ?? 0, effectivePriceCents(listing, input.vendorEstimates)));
   }
   return [...byService.values()].reduce((total, value) => total + value, 0);
@@ -92,7 +106,9 @@ function rankByKnownFacts(a: RecommendationCandidate, b: RecommendationCandidate
 }
 
 export function recommendationPool(input: RecommendationInput) {
-  const allocated = Object.values(input.categoryBudgets ?? {}).reduce<number>((sum, amount) => sum + cents(amount ?? 0), 0);
+  const activeServices = committedServices(input);
+  const allocated = Object.entries(input.categoryBudgets ?? {}).reduce<number>((sum, [service, amount]) =>
+    sum + (activeServices.has(service as RecommendationCandidate["service"]) ? cents(amount ?? 0) : 0), 0);
   if (allocated > cents(input.budget)) throw new Error("Assigned vendor budgets exceed the total event budget.");
   const venue = input.venueId ? input.candidates.find(item => item.id === input.venueId && item.service === "venue") : undefined;
   if (input.phase === "vendors" && !venue) throw new Error("Choose a venue before requesting vendor suggestions.");
@@ -103,7 +119,7 @@ export function recommendationPool(input: RecommendationInput) {
   const eligible = input.candidates.filter(item => (input.phase === "venue" ? item.service === "venue" : item.service !== "venue")
     && (input.phase === "venue" || !input.selectedServices?.includes(item.service as Exclude<typeof item.service, "venue">))
     && fit(item, input.guests, input.budget, input.vendorEstimates)
-    && (input.categoryBudgets?.[item.service] === undefined || effectivePriceCents(item, input.vendorEstimates) <= cents(input.categoryBudgets[item.service]!))
+    && ((input.phase === "venue" && !input.venueId) || input.categoryBudgets?.[item.service] === undefined || effectivePriceCents(item, input.vendorEstimates) <= cents(input.categoryBudgets[item.service]!))
     && committedCents(input, [item.id]) <= cents(input.budget));
   if (input.phase === "venue") return eligible.sort(rankByKnownFacts).slice(0, 15);
   const perService = new Map<string, number>();
