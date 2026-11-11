@@ -12,7 +12,7 @@ export type EventPlan = EventPlanData;
 
 const emptyPlan: EventPlan = {
   name: "My spectacular event", themeId: "", selections: {}, vendorSlots: {}, otherEvents: [],
-  vendorStatuses: {}, vendorEstimates: {}, budgetLimit: "",
+  vendorStatuses: {}, vendorEstimates: {}, categoryBudgets: {}, budgetLimit: "",
   eventDate: "", eventStart: "", eventEnd: "", eventGuests: "",
 };
 
@@ -29,6 +29,7 @@ type PlanContextValue = {
   saveAndShare: () => Promise<ShareResult>;
   refreshShared: () => Promise<void>;
   vendors: Vendor[];
+  directoryReady: boolean;
   directorySource: "sample" | "supabase";
   directoryWarning: string | null;
   directoryError: string | null;
@@ -63,6 +64,8 @@ function sanitizeDraft(value: unknown): EventPlan | null {
       ? Object.fromEntries(Object.entries(item.vendorStatuses).filter(([id, status]) => id.length <= 80 && ["considering", "contacted", "confirmed"].includes(String(status)))) as EventPlan["vendorStatuses"] : {},
     vendorEstimates: item.vendorEstimates && typeof item.vendorEstimates === "object" && !Array.isArray(item.vendorEstimates)
       ? Object.fromEntries(Object.entries(item.vendorEstimates).filter(([id, estimate]) => id.length <= 80 && typeof estimate === "string" && /^$|^\d{1,8}(?:\.\d{1,2})?$/.test(estimate))) : {},
+    categoryBudgets: item.categoryBudgets && typeof item.categoryBudgets === "object" && !Array.isArray(item.categoryBudgets)
+      ? Object.fromEntries(Object.entries(item.categoryBudgets).filter(([service, amount]) => service in serviceLabels && typeof amount === "string" && /^$|^\d{1,8}(?:\.\d{1,2})?$/.test(amount))) : {},
     budgetLimit: typeof item.budgetLimit === "string" && /^$|^\d{1,9}(?:\.\d{1,2})?$/.test(item.budgetLimit) ? item.budgetLimit : "",
     otherEvents: Array.isArray(item.otherEvents) ? item.otherEvents.filter((entry): entry is NamedSchedule =>
       !!entry && typeof entry === "object" && typeof entry.id === "string" && typeof entry.name === "string" && safeSlot(entry.slot)).slice(0, 100) : [],
@@ -81,6 +84,7 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [sharedLoadError, setSharedLoadError] = useState<string | null>(null);
   const [vendors, setVendors] = useState<Vendor[]>(sampleVendors);
+  const [directoryReady, setDirectoryReady] = useState(false);
   const [directorySource, setDirectorySource] = useState<"sample" | "supabase">("sample");
   const [directoryWarning, setDirectoryWarning] = useState<string | null>(null);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
@@ -158,8 +162,9 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
         if (result.source === "supabase" && Array.isArray(result.vendors)) {
           setVendors(result.vendors); setDirectorySource("supabase"); setDirectoryWarning(result.warning ?? null);
         }
+        setDirectoryReady(true);
       })
-      .catch(() => { if (active) setDirectoryError("Couldn’t load the vendor directory. Showing clearly labeled example listings instead."); });
+      .catch(() => { if (active) { setDirectoryError("Couldn’t load the vendor directory. Showing clearly labeled example listings instead."); setDirectoryReady(true); } });
     return () => { active = false; };
   }, []);
 
@@ -205,7 +210,7 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <PlanContext.Provider value={{ plan, setField, resetPlan: () => { setPlan(emptyPlan); setShared(null); setDraftKey(storageKey); setUnsavedChanges(false); sessionStorage.removeItem(sharedStorageKey); sessionStorage.removeItem(dirtySharedKey); history.replaceState(null, "", location.pathname); }, shared: !!shared, unsavedChanges, sharedLoadError, saveAndShare, refreshShared, vendors, directorySource, directoryWarning, directoryError }}>{children}</PlanContext.Provider>;
+  return <PlanContext.Provider value={{ plan, setField, resetPlan: () => { setPlan(emptyPlan); setShared(null); setDraftKey(storageKey); setUnsavedChanges(false); sessionStorage.removeItem(sharedStorageKey); sessionStorage.removeItem(dirtySharedKey); history.replaceState(null, "", location.pathname); }, shared: !!shared, unsavedChanges, sharedLoadError, saveAndShare, refreshShared, vendors, directoryReady, directorySource, directoryWarning, directoryError }}>{children}</PlanContext.Provider>;
 }
 
 export function useEventPlan() {

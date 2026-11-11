@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEventPlan } from "../client/event-plan";
 import { themes } from "../lib/event-themes";
+import { ThemeAnimation } from "../client/theme-animation";
 
 const stars = Array.from({ length: 56 }, (_, index) => ({
   left: `${(index * 37.79 + 13) % 100}%`,
@@ -38,7 +39,7 @@ export default function Home() {
         key={theme.id} type="button" data-theme-id={theme.id} className={`theme-card ${plan.themeId === theme.id ? "selected" : ""}`}
         style={{ "--theme-a": theme.colors[0], "--theme-b": theme.colors[1] } as React.CSSProperties}
         aria-pressed={plan.themeId === theme.id} onClick={() => setField("themeId")(theme.id)}>
-        <span className="theme-sky"><span className="theme-icon" aria-hidden="true">{theme.icon}</span></span>
+        <span className="theme-sky"><ThemeAnimation id={theme.id} /></span>
         <span className="theme-copy"><strong>{theme.name}</strong><small>{theme.line}</small></span>
         <span className="theme-choose">{plan.themeId === theme.id ? "✓ In your orbit" : "Choose this theme ↗"}</span>
       </button>)}</div>

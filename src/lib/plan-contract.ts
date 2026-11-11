@@ -13,6 +13,7 @@ export const eventPlanSchema = z.object({
   vendorSlots: z.record(z.string().max(80), slot),
   vendorStatuses: z.record(z.string().max(80), status),
   vendorEstimates: z.record(z.string().max(80), z.string().regex(/^$|^\d{1,8}(?:\.\d{1,2})?$/)),
+  categoryBudgets: z.partialRecord(service, z.string().regex(/^$|^\d{1,8}(?:\.\d{1,2})?$/)).optional(),
   budgetLimit: z.string().regex(/^$|^\d{1,9}(?:\.\d{1,2})?$/),
   otherEvents: z.array(z.object({ id: z.string().max(80), name: z.string().max(120), slot })).max(100),
   eventDate: date,

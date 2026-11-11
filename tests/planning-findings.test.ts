@@ -20,6 +20,15 @@ test("an invalid calendar date is an explicit finding and blocks AI review", () 
   assert.equal(result.findings.some(item => item.id === "event-time"), true);
 });
 
+test("a missing main date does not hide each vendor's missing schedule", () => {
+  const draft = plan(); draft.eventDate = ""; draft.vendorSlots = {};
+  const result = buildPlanningFindings(draft, sampleVendors);
+  assert.equal(result.scheduleReady, false);
+  assert.ok(result.findings.some(item => item.id === "event-time"));
+  assert.ok(result.findings.some(item => item.id === `missing-slot:${provider.id}`));
+  assert.ok(result.findings.some(item => item.id === "venue-hours"));
+});
+
 test("other events report their overlap with a planned vendor", () => {
   const draft = plan(); draft.otherEvents = [{ id: "staff", name: "Staff briefing", slot: { date: "2026-11-20", start: "17:30", end: "18:30" } }];
   const result = buildPlanningFindings(draft, sampleVendors);

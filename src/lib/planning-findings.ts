@@ -38,6 +38,9 @@ export function buildPlanningFindings(plan: EventPlan, vendors: Vendor[]) {
   const findings: PlanningFinding[] = ruleIssues.map(issue => ({ id: issue.id, title: issue.vendorName, detail: issue.message, tone: "needs-action" }));
   const mainSlot = { date: plan.eventDate, start: plan.eventStart, end: plan.eventEnd };
   if (!validSchedule(mainSlot) || scheduleError) findings.unshift({ id: "event-time", title: "Check event and vendor times", detail: "Choose real dates and same-day start and end times in New York time. Times during a daylight-saving change may need another choice.", tone: "needs-action" });
+  if (!scheduleReady) for (const vendor of selected) {
+    if (!vendor.slot || !validSchedule(vendor.slot)) findings.push({ id: `missing-slot:${vendor.id}`, title: `Set ${vendor.name}'s time`, detail: "Choose a valid date, arrival time, and finish time for this vendor.", tone: "needs-action" });
+  }
   if (missingCount) findings.unshift({ id: "vendors-not-loaded", title: "Some vendor details didn't load", detail: `${missingCount === 1 ? "1 selected vendor is" : `${missingCount} selected vendors are`} not in the vendor list that loaded. Timing rules still use the recorded times. Reload the page, or choose the vendor again, before relying on names and details.`, tone: "check" });
   if (!plan.selections.venue) findings.push({ id: "venue", title: "Choose a venue", detail: "Your event needs a venue before access hours can be checked.", tone: "needs-action" });
   const venueSlot = plan.selections.venue ? plan.vendorSlots[plan.selections.venue] : undefined;
