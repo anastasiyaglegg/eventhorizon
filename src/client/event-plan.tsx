@@ -6,6 +6,7 @@ import type { NamedSchedule, ScheduleSlot } from "../lib/schedule-conflicts";
 import { eventPlanSchema, type EventPlanData } from "../lib/plan-contract";
 import { serviceLabels } from "../lib/services";
 import { SaveRevision } from "../lib/save-revision";
+import { migrateLegacyBudgets } from "../lib/budget";
 
 export { serviceLabels };
 export type Service = keyof typeof serviceLabels;
@@ -54,7 +55,7 @@ const draftKeyFor = (sharedId: string) => `${storageKey}:shared:${sharedId}`;
 function sanitizeDraft(value: unknown): EventPlan | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const item = value as Partial<EventPlan>;
-  return {
+  return migrateLegacyBudgets({
     ...emptyPlan,
     name: typeof item.name === "string" ? item.name.slice(0, 120) : emptyPlan.name,
     themeId: typeof item.themeId === "string" ? item.themeId : "",
@@ -75,7 +76,7 @@ function sanitizeDraft(value: unknown): EventPlan | null {
     eventStart: typeof item.eventStart === "string" ? item.eventStart : "",
     eventEnd: typeof item.eventEnd === "string" ? item.eventEnd : "",
     eventGuests: typeof item.eventGuests === "string" ? item.eventGuests : "",
-  };
+  });
 }
 
 export function EventPlanProvider({ children }: { children: ReactNode }) {
@@ -125,7 +126,7 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
       try {
         const parsed = eventPlanSchema.safeParse(JSON.parse(decodeURIComponent(hash.get("copy") ?? "")) as unknown);
         const hasOwnWork = !!draft && JSON.stringify(draft) !== JSON.stringify(emptyPlan) && JSON.stringify(draft) !== JSON.stringify(parsed.data);
-        if (parsed.success && (!hasOwnWork || window.confirm("Open the copied plan? It will replace the plan saved on this device."))) draft = parsed.data;
+        if (parsed.success && (!hasOwnWork || window.confirm("Open the copied plan? It will replace the plan saved on this device."))) draft = migrateLegacyBudgets(parsed.data);
       } catch { /* Invalid copied links leave the local plan intact. */ }
       // Drop the copy from the address bar so a reload does not wipe later edits.
       history.replaceState(null, "", location.pathname + location.search);
@@ -143,9 +144,11 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
           if (!parsed.success || !data.version) throw new Error("The shared plan could not be read.");
           const preserveDraft = editedDuringLoad.current || (dirty?.id === sharedLink.id && !!draft);
           const version = preserveDraft && dirty?.id === sharedLink.id && Number.isInteger(dirty.version) ? dirty.version! : data.version;
-          if (!preserveDraft) setPlan(parsed.data);
-          setShared({ ...sharedLink, version }); setUnsavedChanges(preserveDraft); setSharedLoadError(null);
-          if (preserveDraft) sessionStorage.setItem(dirtySharedKey, JSON.stringify({ id: sharedLink.id, version }));
+          const migrated = migrateLegacyBudgets(parsed.data);
+          const hasChanges = preserveDraft || migrated !== parsed.data;
+          if (!preserveDraft) setPlan(migrated);
+          setShared({ ...sharedLink, version }); setUnsavedChanges(hasChanges); setSharedLoadError(null);
+          if (hasChanges) sessionStorage.setItem(dirtySharedKey, JSON.stringify({ id: sharedLink.id, version }));
           else sessionStorage.removeItem(dirtySharedKey);
           sessionStorage.setItem(sharedStorageKey, JSON.stringify({ ...sharedLink, version }));
         }).catch(error => setSharedLoadError(error instanceof Error ? error.message : "Could not open the shared plan."));
@@ -185,12 +188,14 @@ export function EventPlanProvider({ children }: { children: ReactNode }) {
     if (!response.ok) throw new Error(data.error ?? "Could not refresh the shared plan.");
     const parsed = eventPlanSchema.safeParse(data.plan);
     if (!parsed.success || !data.version) throw new Error("The shared plan could not be read.");
-    setPlan(parsed.data); setShared({ ...shared, version: data.version }); setUnsavedChanges(false); setSharedLoadError(null); sessionStorage.removeItem(dirtySharedKey);
+    const migrated = migrateLegacyBudgets(parsed.data);
+    setPlan(migrated); setShared({ ...shared, version: data.version }); setUnsavedChanges(migrated !== parsed.data); setSharedLoadError(null);
+    if (migrated !== parsed.data) sessionStorage.setItem(dirtySharedKey, JSON.stringify({ id: shared.id, version: data.version })); else sessionStorage.removeItem(dirtySharedKey);
     sessionStorage.setItem(sharedStorageKey, JSON.stringify({ ...shared, version: data.version }));
   }
 
   async function saveAndShare(): Promise<ShareResult> {
-    const parsed = eventPlanSchema.safeParse(plan);
+    const parsed = eventPlanSchema.safeParse(migrateLegacyBudgets(plan));
     if (!parsed.success) throw new Error("Check the event details before saving the plan.");
     if (shared && !unsavedChanges) return { link: `${location.origin}${location.pathname}?plan=${shared.id}#key=${shared.token}`, live: true };
     const sentRevision = saveRevision.current.snapshot();

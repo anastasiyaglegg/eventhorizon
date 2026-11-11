@@ -14,7 +14,7 @@ plan does not make a reservation or send an email.
   the event run sheet in time order. The calendar also shows three clearly
   labeled fictional example events with vendor setup times; hide them with one
   button. Examples never enter a saved plan or its conflict checks.
-- Enter a total budget and vendor estimates. Missing prices stay unknown.
+- Enter a total budget and one planned spending amount for each vendor category. Missing listing prices stay unknown.
 - Review timing concerns. Application code checks the scheduling rules, then the
   Planning and Recovery agents rank concerns and suggest next steps. They do not
   change bookings or contact vendors.
@@ -31,10 +31,13 @@ directory, the plan still shows its saved choice. You can set its time, remove
 it, or search for a replacement. A search result already in the plan is labeled
 **Already in your plan**.
 
-Budget totals use complete dollar amounts. While an estimate is unfinished,
-such as `500.`, the planning views use the listing's starting price until the
-estimate is valid. Category budget warnings use readable service names. The
-fictional calendar examples stay in the event's month and off its date.
+The category budget is the amount planned for that vendor. It is editable in
+both the suggested group and chosen plan, and the report uses the same amount.
+Planned spend is the sum of those budgets; listed starting prices appear only
+as comparisons and are not silently added to the total. An unfinished entry,
+such as `500.`, does not count until completed. Older saved vendor estimates
+move into empty category budgets when a plan is opened. The fictional calendar
+examples stay in the event's month and off its date.
 
 ## Run locally
 

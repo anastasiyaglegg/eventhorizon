@@ -4,52 +4,59 @@ import { serviceLabels } from "./services";
 
 type BudgetPlan = Pick<EventPlanData, "selections" | "vendorEstimates" | "categoryBudgets" | "budgetLimit">;
 type PriceSource = Pick<Vendor, "id" | "priceMin">;
+type Service = keyof typeof serviceLabels;
 export const amountCents = (value: string | undefined) => value && /^\d{1,9}(?:\.\d{1,2})?$/.test(value) ? Math.round(Number(value) * 100) : null;
 
-/** User estimates take precedence. Otherwise a listed starting price is a planning floor, never a quote. */
-export function budgetSummary(plan: BudgetPlan, vendors: PriceSource[] = []) {
-  const ids = [...new Set(Object.values(plan.selections).filter((id): id is string => !!id))];
-  const price = (id: string) => amountCents(plan.vendorEstimates[id]) ?? (vendors.find(vendor => vendor.id === id)?.priceMin == null ? null : Math.round(vendors.find(vendor => vendor.id === id)!.priceMin! * 100));
-  const known = ids.filter(id => price(id) !== null);
-  const estimatedCents = known.reduce((total, id) => total + price(id)!, 0);
+/** Keep old saved amounts when moving from separate estimates to one budget per category. */
+export function migrateLegacyBudgets<T extends BudgetPlan>(plan: T): T {
+  if (!Object.keys(plan.vendorEstimates).length) return plan;
+  const categoryBudgets = { ...plan.categoryBudgets };
+  for (const [service, id] of Object.entries(plan.selections)) {
+    if (!id || amountCents(categoryBudgets[service as Service]) !== null) continue;
+    const oldAmount = amountCents(plan.vendorEstimates[id]);
+    if (oldAmount !== null) categoryBudgets[service as Service] = (oldAmount / 100).toFixed(2);
+  }
+  return { ...plan, categoryBudgets, vendorEstimates: {} };
+}
+
+/** A category budget is the planned amount to spend; listed prices never enter this total. */
+export function budgetSummary(plan: BudgetPlan) {
+  const plannedCents = Object.values(plan.categoryBudgets ?? {}).reduce<number>((total, amount) => total + (amountCents(amount) ?? 0), 0);
   const limitCents = amountCents(plan.budgetLimit);
-  const assignedCents = Object.values(plan.categoryBudgets ?? {}).reduce<number>((total, amount) =>
-    total + (amountCents(amount) ?? 0), 0);
+  const unbudgetedCount = Object.entries(plan.selections).filter(([service, id]) => !!id && amountCents(plan.categoryBudgets?.[service as Service]) === null).length;
   return {
-    estimatedCents,
+    plannedCents,
     limitCents,
-    remainingCents: limitCents === null ? null : limitCents - estimatedCents,
-    assignedCents,
-    unassignedCents: limitCents === null ? null : limitCents - assignedCents,
-    unknownCount: ids.length - known.length,
-    startingPriceCount: known.filter(id => amountCents(plan.vendorEstimates[id]) === null).length,
+    remainingCents: limitCents === null ? null : limitCents - plannedCents,
+    unbudgetedCount,
   };
 }
 
 export type BudgetFinding = { id: string; title: string; detail: string; tone: "needs-action" | "check" };
 
 export function buildBudgetFindings(plan: BudgetPlan, vendors: PriceSource[]): BudgetFinding[] {
-  const summary = budgetSummary(plan, vendors);
+  const summary = budgetSummary(plan);
   const findings: BudgetFinding[] = [];
   if (summary.limitCents === null) findings.push({ id: "budget-total", title: "Set an event budget", detail: "A total budget is needed to check whether the plan fits.", tone: "needs-action" });
-  if (summary.remainingCents !== null && summary.remainingCents < 0) findings.push({ id: "budget-over", title: "Plan exceeds the event budget", detail: `Known estimates and starting prices are ${money(-summary.remainingCents)} above the total budget.`, tone: "needs-action" });
-  if (summary.unassignedCents !== null && summary.unassignedCents < 0) findings.push({ id: "budget-allocated", title: "Category budgets exceed the total", detail: `You assigned ${money(-summary.unassignedCents)} more than the event budget.`, tone: "needs-action" });
+  if (summary.remainingCents !== null && summary.remainingCents < 0) findings.push({ id: "budget-over", title: "Plan exceeds the event budget", detail: `Planned category spending is ${money(-summary.remainingCents)} above the total budget.`, tone: "needs-action" });
   for (const [service, id] of Object.entries(plan.selections)) {
     if (!id) continue;
-    const cap = amountCents(plan.categoryBudgets?.[service as keyof NonNullable<BudgetPlan["categoryBudgets"]>]);
-    const estimate = amountCents(plan.vendorEstimates[id]) ?? (vendors.find(vendor => vendor.id === id)?.priceMin == null ? null : Math.round(vendors.find(vendor => vendor.id === id)!.priceMin! * 100));
-    if (cap !== null && estimate !== null && estimate > cap) {
-      const label = serviceLabels[service as keyof typeof serviceLabels];
-      findings.push({ id: `category-over:${service}`, title: `${label} exceeds its category budget`, detail: `This selected listing is ${money(estimate - cap)} above the amount assigned to ${label}.`, tone: "needs-action" });
+    const budget = amountCents(plan.categoryBudgets?.[service as Service]);
+    const label = serviceLabels[service as Service];
+    if (budget === null) {
+      findings.push({ id: `category-missing:${service}`, title: `Set a budget for ${label}`, detail: `${label} is selected but has no planned spending amount. Add one to complete the total.`, tone: "check" });
+      continue;
+    }
+    const listedPrice = vendors.find(vendor => vendor.id === id)?.priceMin;
+    if (listedPrice !== null && listedPrice !== undefined && Math.round(listedPrice * 100) > budget) {
+      findings.push({ id: `category-below-list:${service}`, title: `${label} may cost more than planned`, detail: `The listing starts at ${money(Math.round(listedPrice * 100))}, above your ${money(budget)} budget. Confirm the price or adjust the budget.`, tone: "check" });
     }
   }
-  if (summary.unknownCount) findings.push({ id: "budget-unknown", title: "Some prices are still unknown", detail: `${summary.unknownCount} selected listing${summary.unknownCount === 1 ? " has" : "s have"} no entered estimate or listed starting price. The total may increase.`, tone: "check" });
-  if (summary.startingPriceCount) findings.push({ id: "budget-starting", title: "Starting prices need confirmation", detail: `${summary.startingPriceCount} listed starting price${summary.startingPriceCount === 1 ? " is" : "s are"} used in this planning total. Ask the vendor for an actual quote.`, tone: "check" });
   return findings;
 }
 
 /** Give every suggested category a planning allowance; reserve 20% of the surplus as a cushion. */
-export function suggestCategoryBudgets(plan: BudgetPlan, choices: { service: keyof NonNullable<BudgetPlan["categoryBudgets"]>; priceMin: number | null }[]) {
+export function suggestCategoryBudgets(plan: BudgetPlan, choices: { service: Service; priceMin: number | null }[]) {
   const total = amountCents(plan.budgetLimit);
   const next = { ...plan.categoryBudgets };
   const assigned = Object.values(next).reduce<number>((sum, value) => sum + (amountCents(value) ?? 0), 0);
@@ -58,7 +65,7 @@ export function suggestCategoryBudgets(plan: BudgetPlan, choices: { service: key
   const floorTotal = floors.reduce((sum, value) => sum + value, 0);
   const spare = total === null ? 0 : total - assigned - floorTotal;
   const cushionPerCategory = spare > 0 && missing.length ? Math.floor(Math.floor(spare * 0.8) / missing.length) : 0;
-  const suggested: Partial<Record<keyof NonNullable<BudgetPlan["categoryBudgets"]>, number>> = {};
+  const suggested: Partial<Record<Service, number>> = {};
   const unfilled: string[] = [];
   for (const [index, choice] of missing.entries()) {
     const allowance = floors[index] + cushionPerCategory;

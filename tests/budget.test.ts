@@ -1,31 +1,32 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { amountCents, budgetSummary, buildBudgetFindings, suggestCategoryBudgets } from "../src/lib/budget";
+import { amountCents, budgetSummary, buildBudgetFindings, migrateLegacyBudgets, suggestCategoryBudgets } from "../src/lib/budget";
 
-test("budget counts selected vendors once and keeps missing estimates visible", () => {
-  const result = budgetSummary({
-    selections: { venue: "venue-1", catering: "food-1", bakery: "food-1", florist: "flowers-1" },
-    vendorEstimates: { "venue-1": "1500.50", "food-1": "899.99", "removed": "9999" },
+test("category budgets alone determine planned spend and remaining money", () => {
+  const plan = {
+    selections: { venue: "venue-1", catering: "food-1", florist: "flowers-1" },
+    vendorEstimates: { "venue-1": "9000", "food-1": "1" },
+    categoryBudgets: { venue: "1500.50", catering: "899.99" },
     budgetLimit: "3000",
-  });
-  assert.deepEqual(result, { estimatedCents: 240049, limitCents: 300000, remainingCents: 59951, assignedCents: 0, unassignedCents: 300000, unknownCount: 1, startingPriceCount: 0 });
+  };
+  assert.deepEqual(budgetSummary(plan), { plannedCents: 240049, limitCents: 300000, remainingCents: 59951, unbudgetedCount: 1 });
 });
 
-test("budget can show a shortfall without inventing missing prices", () => {
-  assert.deepEqual(budgetSummary({ selections: { venue: "v" }, vendorEstimates: { v: "75" }, budgetLimit: "50" }),
-    { estimatedCents: 7500, limitCents: 5000, remainingCents: -2500, assignedCents: 0, unassignedCents: 5000, unknownCount: 0, startingPriceCount: 0 });
+test("overspending is counted once from the same category budgets shown on screen", () => {
+  const plan = { selections: { venue: "v", catering: "c" }, vendorEstimates: {}, categoryBudgets: { venue: "1200", catering: "900" }, budgetLimit: "2000" };
+  assert.equal(budgetSummary(plan).remainingCents, -10000);
+  assert.deepEqual(buildBudgetFindings(plan, []).filter(item => item.tone === "needs-action").map(item => item.id), ["budget-over"]);
 });
 
-test("listed starting prices flow into the chosen plan, while entered estimates take priority", () => {
-  const plan = { selections: { venue: "v", catering: "c" }, vendorEstimates: { c: "1300" }, categoryBudgets: { venue: "900", catering: "1200" }, budgetLimit: "2000" };
-  const prices = [{ id: "v", priceMin: 1000 }, { id: "c", priceMin: 800 }];
-  const summary = budgetSummary(plan, prices);
-  assert.equal(summary.estimatedCents, 230000);
-  assert.equal(summary.startingPriceCount, 1);
-  assert.deepEqual(buildBudgetFindings(plan, prices).filter(item => item.tone === "needs-action").map(item => item.id), ["budget-over", "budget-allocated", "category-over:venue", "category-over:catering"]);
+test("listed starting prices are references and never silently added to planned spend", () => {
+  const plan = { selections: { venue: "v", catering: "c" }, vendorEstimates: {}, categoryBudgets: { venue: "900", catering: "800" }, budgetLimit: "2000" };
+  assert.equal(budgetSummary(plan).plannedCents, 170000);
+  const findings = buildBudgetFindings(plan, [{ id: "v", priceMin: 1000 }, { id: "c", priceMin: 700 }]);
+  assert.deepEqual(findings.map(item => item.id), ["category-below-list:venue"]);
+  assert.match(findings[0].detail, /above your \$900\.00 budget/);
 });
 
-test("suggested category budgets fill empty amounts without overwriting a person's choices", () => {
+test("suggested budgets fill empty categories without overwriting a person's amounts", () => {
   const plan = { selections: { venue: "v" }, vendorEstimates: {}, categoryBudgets: { venue: "1500" }, budgetLimit: "3000" };
   const result = suggestCategoryBudgets(plan, [{ service: "venue", priceMin: 1000 }, { service: "catering", priceMin: 800 }, { service: "florist", priceMin: 300 }]);
   assert.equal(result.budgets.venue, "1500");
@@ -33,10 +34,10 @@ test("suggested category budgets fill empty amounts without overwriting a person
   assert.equal(result.budgets.florist, "460.00");
   assert.equal(result.suggested.catering, 96000);
   assert.deepEqual(result.unfilled, []);
-  assert.equal(budgetSummary({ ...plan, categoryBudgets: result.budgets }).unassignedCents, 8000);
+  assert.equal(budgetSummary({ ...plan, categoryBudgets: result.budgets }).remainingCents, 8000);
 });
 
-test("unknown listing prices get a labeled planning allowance when the event has room", () => {
+test("unknown listing prices can receive a planning budget when there is room", () => {
   const plan = { selections: {}, vendorEstimates: {}, categoryBudgets: {}, budgetLimit: "1000" };
   const result = suggestCategoryBudgets(plan, [{ service: "florist", priceMin: null }, { service: "catering", priceMin: 500 }]);
   assert.equal(result.budgets.florist, "200.00");
@@ -44,23 +45,18 @@ test("unknown listing prices get a labeled planning allowance when the event has
   assert.deepEqual(result.unfilled, []);
 });
 
-test("category budgets add once and show the amount left to assign", () => {
-  const result = budgetSummary({ selections: {}, vendorEstimates: {}, budgetLimit: "5000", categoryBudgets: { venue: "2000", catering: "1250.50", florist: "400" } });
-  assert.equal(result.assignedCents, 365050);
-  assert.equal(result.unassignedCents, 134950);
-  assert.equal(result.estimatedCents, 0);
+test("legacy vendor estimates move into empty category budgets without replacing existing budgets", () => {
+  const old = { selections: { venue: "v", catering: "c" }, vendorEstimates: { v: "1200", c: "800", removed: "9999" }, categoryBudgets: { venue: "1500" }, budgetLimit: "3000" };
+  const migrated = migrateLegacyBudgets(old);
+  assert.deepEqual(migrated.categoryBudgets, { venue: "1500", catering: "800.00" });
+  assert.deepEqual(migrated.vendorEstimates, {});
+  assert.equal(budgetSummary(migrated).plannedCents, 230000);
 });
 
-test("unfinished decimal estimates use the listed starting price in both planning views", () => {
+test("unfinished amounts stay unbudgeted and use readable service labels", () => {
   assert.equal(amountCents("500."), null);
-  const summary = budgetSummary({ selections: { catering: "c" }, vendorEstimates: { c: "500." }, budgetLimit: "1000" }, [{ id: "c", priceMin: 200 }]);
-  assert.equal(summary.estimatedCents, 20000);
-  assert.equal(summary.startingPriceCount, 1);
-});
-
-test("category budget findings use the readable service label", () => {
-  const findings = buildBudgetFindings({ selections: { av: "a" }, vendorEstimates: { a: "500" }, categoryBudgets: { av: "300" }, budgetLimit: "1000" }, []);
-  const finding = findings.find(item => item.id === "category-over:av")!;
-  assert.match(finding.title, /^AV exceeds/);
-  assert.match(finding.detail, /assigned to AV/);
+  const plan = { selections: { av: "a" }, vendorEstimates: {}, categoryBudgets: { av: "500." }, budgetLimit: "1000" };
+  assert.equal(budgetSummary(plan).unbudgetedCount, 1);
+  const finding = buildBudgetFindings(plan, []).find(item => item.id === "category-missing:av")!;
+  assert.match(finding.title, /budget for AV/);
 });

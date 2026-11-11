@@ -5,7 +5,7 @@ import Link from "next/link";
 import { findScheduleOverlaps, validSchedule } from "../../lib/schedule-conflicts";
 import { capacityLabel, samplePrice, searchVendors, searchVendorNames, type VendorCriteria, type Vendor } from "../../lib/vendor-search";
 import { serviceLabels, useEventPlan, type Service } from "../../client/event-plan";
-import { budgetSummary, buildBudgetFindings, money } from "../../lib/budget";
+import { amountCents, budgetSummary, buildBudgetFindings, money } from "../../lib/budget";
 import { themeName } from "../../lib/event-themes";
 import { formatTimeEntry } from "../../lib/time-input";
 import { RecommendationPanel } from "../../client/recommendation-panel";
@@ -24,13 +24,13 @@ type Turn = { query: string; message: string; matches: Vendor[]; possibleMatches
 
 export default function VendorFinder() {
   const { plan, setField, vendors, directorySource, directoryWarning, directoryError } = useEventPlan();
-  const { name, themeId, selections, vendorSlots, vendorStatuses, vendorEstimates, budgetLimit, otherEvents, eventDate, eventStart, eventEnd, eventGuests } = plan;
+  const { name, themeId, selections, vendorSlots, vendorStatuses, categoryBudgets, budgetLimit, otherEvents, eventDate, eventStart, eventEnd, eventGuests } = plan;
   const eventName = name.trim();
   const selectedTheme = themeName(themeId);
   const plannedVendors = selectedPlanRows(plan, vendors);
   const setSelections = setField("selections"), setVendorSlots = setField("vendorSlots");
-  const setVendorStatuses = setField("vendorStatuses"), setVendorEstimates = setField("vendorEstimates"), setBudgetLimit = setField("budgetLimit");
-  const budget = budgetSummary(plan, vendors);
+  const setVendorStatuses = setField("vendorStatuses"), setCategoryBudgets = setField("categoryBudgets"), setBudgetLimit = setField("budgetLimit");
+  const budget = budgetSummary(plan);
   const budgetFindings = buildBudgetFindings(plan, vendors);
   const setEventName = setField("name"), setEventDate = setField("eventDate"), setEventStart = setField("eventStart"), setEventEnd = setField("eventEnd"), setEventGuests = setField("eventGuests");
   const [query, setQuery] = useState("");
@@ -56,7 +56,7 @@ export default function VendorFinder() {
     setSelections(current => ({ ...current, [service]: undefined }));
     setVendorSlots(current => { const updated = { ...current }; delete updated[id]; return updated; });
     setVendorStatuses(current => { const updated = { ...current }; delete updated[id]; return updated; });
-    setVendorEstimates(current => { const updated = { ...current }; delete updated[id]; return updated; });
+    setCategoryBudgets(current => { const updated = { ...current }; delete updated[service]; return updated; });
   }
   const dialogRef = useRef<HTMLDialogElement>(null);
   const validTime = (value: string) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
@@ -65,10 +65,10 @@ export default function VendorFinder() {
       const service = vendor.service as Service;
       const previousId = selections[service];
       setSelections(current => ({ ...current, [service]: vendor.id }));
+      if (vendor.priceMin !== null) setCategoryBudgets(current => amountCents(current?.[service]) === null ? { ...current, [service]: vendor.priceMin!.toFixed(2) } : current);
       if (previousId && previousId !== vendor.id) {
         setVendorSlots(current => { const updated = { ...current }; delete updated[previousId]; return updated; });
         setVendorStatuses(current => { const updated = { ...current }; delete updated[previousId]; return updated; });
-        setVendorEstimates(current => { const updated = { ...current }; delete updated[previousId]; return updated; });
       }
     }
     if (!dialogRef.current?.open) dialogRef.current?.showModal();
@@ -143,16 +143,15 @@ export default function VendorFinder() {
             <strong>{label}: {vendor ? detailsButton(vendor) : selectedName}</strong>
             {!vendor && <p className="helper">Details did not load. You can set a time, remove this choice, or find a replacement below.</p>}
             <p>{scheduled && slot ? `${slot.date} · ${slot.start}–${slot.end}` : <span className="booking-missing">Date and time not set</span>}{service === "venue" && (eventGuests ? ` · ${eventGuests} planned guests` : <span className="booking-missing"> · Guest count not set</span>)}</p>
-            <p>Budget for {label}: {plan.categoryBudgets?.[service] ? money(Math.round(Number(plan.categoryBudgets[service]) * 100)) : "Not assigned"}</p>
             {overlaps.length > 0 && <p className="booking-conflict">Room conflict with {overlaps.map(item => item.name).join(", ")}. Change the event or vendor time.</p>}
             {outsideVenue && <p className="booking-conflict">Outside the venue access hours.</p>}
             {service !== "venue" && slot && venueSlot && validSchedule(slot) && validSchedule(venueSlot) && slot.date !== venueSlot.date && <p className="helper">Confirm venue access for this separate date.</p>}
           </div><div className="vendor-progress">
             <label>Status<select aria-label={`${selectedName} status`} value={vendorStatuses[id] ?? "considering"} onChange={event => setVendorStatuses(current => ({ ...current, [id]: event.target.value as EventPlanStatus }))}><option value="considering">Considering</option><option value="contacted">Contacted</option><option value="confirmed">Confirmed by vendor</option></select></label>
-            <label>Estimated cost ($)<input aria-label={`${selectedName} estimated cost`} inputMode="decimal" placeholder="Unknown" value={vendorEstimates[id] ?? ""} onChange={event => { if (/^$|^\d{1,8}(?:\.\d{0,2})?$/.test(event.target.value)) setVendorEstimates(current => ({ ...current, [id]: event.target.value })); }} /></label>
+            <label>Budget for {label} ($)<input aria-label={`${selectedName} budget`} inputMode="decimal" placeholder="Set planned amount" value={categoryBudgets?.[service] ?? ""} onChange={event => { if (/^$|^\d{1,8}(?:\.\d{0,2})?$/.test(event.target.value)) setCategoryBudgets(current => ({ ...current, [service]: event.target.value })); }} /></label>
           </div><div className="decision-row"><button type="button" className="secondary-button" onClick={() => openSlot(id, selectedName, slot)}>Set date and time</button><button type="button" className="secondary-button" onClick={() => removeVendor(service, id)}>Remove</button></div></li>;
         })}</ul>
-        <section className="budget-snapshot" aria-label="Budget snapshot"><div><h3>Budget snapshot</h3><p className="helper">Planning total uses your entered estimates first, then listed starting prices. Neither confirms a quote.</p></div><div className="budget-numbers"><div><span>Planning total</span><strong>{money(budget.estimatedCents)}</strong></div><div><span>{budget.remainingCents !== null && budget.remainingCents < 0 ? "Over budget" : "Remaining"}</span><strong>{budget.remainingCents === null ? "Set a budget" : money(Math.abs(budget.remainingCents))}</strong></div><div><span>Prices to confirm</span><strong>{budget.unknownCount + budget.startingPriceCount}</strong></div></div>{budgetFindings.filter(item => item.tone === "needs-action").map(item => <p className="booking-conflict" key={item.id}>{item.detail}</p>)}</section></div>
+        <section className="budget-snapshot" aria-label="Budget snapshot"><div><h3>Budget snapshot</h3><p className="helper">Your category budgets are the amounts you plan to spend. Listed prices are for comparison and still need confirmation.</p></div><div className="budget-numbers"><div><span>Planned spend</span><strong>{money(budget.plannedCents)}</strong></div><div><span>{budget.remainingCents !== null && budget.remainingCents < 0 ? "Over budget" : "Remaining"}</span><strong>{budget.remainingCents === null ? "Set a budget" : money(Math.abs(budget.remainingCents))}</strong></div><div><span>Vendors without a budget</span><strong>{budget.unbudgetedCount}</strong></div></div>{budgetFindings.filter(item => item.tone === "needs-action").map(item => <p className="booking-conflict" key={item.id}>{item.detail}</p>)}</section></div>
       </section>
       <section className="panel" id="vendor-search" aria-labelledby="search-heading">
         <h2 id="search-heading">What do you need for your event?</h2>

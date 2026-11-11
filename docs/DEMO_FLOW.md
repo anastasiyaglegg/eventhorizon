@@ -19,11 +19,11 @@ This is the expanded planning demo. The approved core scenario in `PRD.md` remai
 | Vendor group | Chosen venue, category budgets, selected vendors, and directory facts → recommendation agent → checked IDs | At most one per category. The known price or reserved category budget, whichever is larger, counts toward the total. Affordable missing categories may be filled from the same directory snapshot. |
 | Saved plan | Coordinator's choices → browser plan | Suggestions never become selections until the coordinator chooses them. No booking or message is sent. |
 | Timing review | Saved plan → deterministic time rules → Planning Agent → Recovery Agent | Code checks dates, 24-hour times, daylight-saving ambiguity, vendor arrival windows, room overlaps, and access gaps. Agents receive only rule issue IDs; outputs must refer to every supplied issue exactly once and use permitted actions. |
-| Report | Saved plan + deterministic budget and time findings → coordinator | Entered estimates override listed starting prices. Unknown prices and unconfirmed availability stay visible. The report does not assert a real reservation. |
+| Report | Saved plan + deterministic budget and time findings → coordinator | The same category budgets used in the plan are summed as planned spend. Listed prices are comparisons only. Unknown prices and unconfirmed availability stay visible. The report does not assert a real reservation. |
 
 ## Budget example
 
-With a $5,000 event budget, a $2,000 venue and $1,000 already reserved for photography leave at most $2,000 for other known commitments. A $2,100 caterer is excluded even if the photographer has not been picked yet. If the coordinator enters a $2,300 quote for the venue, that entered estimate replaces its $2,000 listed starting price in the saved plan's planning total. A category or total overrun appears as a finding.
+With a $5,000 event budget, a $2,000 venue budget and $1,000 photography budget leave $2,000 for other planned spending. A caterer listing that starts at $2,100 needs a larger category budget or a different choice. If the coordinator changes the venue budget to $2,300, both the chosen plan and report show $2,300, and the remaining amount becomes $1,700. A category budget below a listed starting price or a total overrun appears as a finding. A listing price is not a confirmed quote.
 
 ## Time example
 

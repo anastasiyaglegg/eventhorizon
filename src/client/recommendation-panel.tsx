@@ -28,12 +28,8 @@ export function RecommendationPanel() {
   const candidates = selectRecommendationCandidates(vendors.filter(vendor => Object.hasOwn(serviceLabels, vendor.service)).map(compact), plan.selections.venue, selectedPlanIds);
   const selectedVendorIds = selectedIdsInCandidates(selectedPlanIds, candidates);
   const categoryBudgets = Object.fromEntries(Object.entries(plan.categoryBudgets ?? {}).filter(([, amount]) => amount && Number(amount) > 0).map(([service, amount]) => [service, Number(amount)]));
-  const vendorEstimates = Object.fromEntries(candidates.flatMap(vendor => {
-    const estimate = amountCents(plan.vendorEstimates[vendor.id]);
-    return estimate === null ? [] : [[vendor.id, estimate / 100]];
-  }));
   const allCategoriesChosen = phase === "vendors" && selectedServices.length === 7;
-  const request: RecommendationInput | null = ready && !allCategoriesChosen ? { phase, budget, guests, venueId: plan.selections.venue, selectedServices, selectedVendorIds, categoryBudgets, vendorEstimates, candidates } : null;
+  const request: RecommendationInput | null = ready && !allCategoriesChosen ? { phase, budget, guests, venueId: plan.selections.venue, selectedServices, selectedVendorIds, categoryBudgets, candidates } : null;
   const key = request ? JSON.stringify(request) : "";
   const [result, setResult] = useState<{ key: string; value: RecommendationResponse } | null>(null);
   const [error, setError] = useState<{ key: string; message: string } | null>(null);
@@ -75,18 +71,12 @@ export function RecommendationPanel() {
   const venue = vendors.find(vendor => vendor.id === plan.selections.venue);
   const venueTooSmall = venue?.capacityMax !== null && venue?.capacityMax !== undefined && venue.capacityMax < guests;
   const searching = !!key && (loadingKey === key || (!response && error?.key !== key));
-  const allocation = budgetSummary(plan, vendors);
-  const planningPrice = (vendor: Vendor) => {
-    const estimate = amountCents(plan.vendorEstimates[vendor.id]);
-    return estimate === null ? vendor.priceMin : estimate / 100;
-  };
+  const allocation = budgetSummary(plan);
   const budgetChoices = [venue, ...selectedVendorIds.map(id => vendors.find(vendor => vendor.id === id)), ...recommended]
-    .filter((vendor): vendor is Vendor => !!vendor).map(vendor => ({ service: vendor.service as Service, priceMin: planningPrice(vendor) }));
+    .filter((vendor): vendor is Vendor => !!vendor).map(vendor => ({ service: vendor.service as Service, priceMin: vendor.priceMin }));
   const suggestedBudgets = suggestCategoryBudgets(plan, budgetChoices);
-  const groupVendors = [...new Map([venue, ...selectedVendorIds.map(id => vendors.find(vendor => vendor.id === id)), ...recommended]
-    .filter((vendor): vendor is Vendor => !!vendor).map(vendor => [vendor.id, vendor])).values()];
-  const planningCostTotal = groupVendors.reduce((total, vendor) => total + (planningPrice(vendor) ?? 0), 0);
-  const unknownPlanningPrices = groupVendors.filter(vendor => planningPrice(vendor) === null).length;
+  const suggestedSpendCents = Object.values(suggestedBudgets.budgets).reduce<number>((total, amount) => total + (amountCents(amount) ?? 0), 0);
+  const suggestedRemainingCents = cents(budget) - suggestedSpendCents;
   const groupFitsBudget = !!request && (!request.venueId || candidates.some(vendor => vendor.id === request.venueId))
     && committedCents(request, recommended.map(vendor => vendor.id)) <= cents(budget);
   function possibleOption(service: Service) {
@@ -104,15 +94,11 @@ export function RecommendationPanel() {
     }} />{suggestedBudgets.suggested[service] !== undefined ? <small>Suggested planning budget: {money(suggestedBudgets.suggested[service]!)}{priceMin !== null ? ` · listed starting price ${money(Math.round(priceMin * 100))}` : " · listing price unknown"}</small> : priceMin !== null ? <small>Listed starting price: {money(Math.round(priceMin * 100))}</small> : <small>Listing price unknown; choose a planning amount.</small>}</label>;
   }
 
-  function estimateField(vendor: Vendor | undefined) {
-    if (!vendor) return null;
-    return <label className="category-budget">Estimated cost ($)<input aria-label={`${vendor.name} estimated cost in suggestions`} inputMode="decimal" placeholder="Unknown" value={plan.vendorEstimates[vendor.id] ?? ""} onChange={event => {
-      const value = event.target.value;
-      if (/^$|^\d{1,8}(?:\.\d{0,2})?$/.test(value)) setField("vendorEstimates")(current => ({ ...current, [vendor.id]: value }));
-    }} /><small>Your estimate, not a vendor quote.</small></label>;
+  function chooseVenue(id: string) {
+    setField("selections")(current => ({ ...current, venue: id }));
+    const listed = vendors.find(vendor => vendor.id === id)?.priceMin;
+    if (listed !== null && listed !== undefined) setField("categoryBudgets")(current => amountCents(current?.venue) === null ? { ...current, venue: listed.toFixed(2) } : current);
   }
-
-  function chooseVenue(id: string) { setField("selections")(current => ({ ...current, venue: id })); }
   function chooseGroup() {
     if (!groupFitsBudget) return;
     setField("selections")(current => {
@@ -136,15 +122,24 @@ export function RecommendationPanel() {
           : error?.key === key && !venueTooSmall ? <div className="alert" role="alert"><p>{error.message}</p><button type="button" className="secondary-button" onClick={() => { setError(null); setRetryCount(count => count + 1); }}>Try again</button></div>
           : response ? <p className="helper">{response.note}</p> : null}
         {phase === "venue" && response && <ul className="recommendation-list">{recommended.map(vendor => <li key={vendor.id}><div><strong>{detailsButton(vendor)}</strong><p>{vendor.borough} · {vendor.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(vendor)} · Capacity: {capacityLabel(vendor)}</p></div><button type="button" className="secondary-button" onClick={() => chooseVenue(vendor.id)}>Choose venue</button></li>)}</ul>}
-        {phase === "vendors" && <><p className="helper">Suggestions prefer the chosen venue’s borough. Listed prices and capacities are planning clues, not confirmed quotes or availability.</p><ul className="recommendation-list"><li><div><strong>Venue</strong><p>{venue ? detailsButton(venue) : "Venue details unavailable"} · selected by you</p>{venue && <small>{venue.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(venue)}</small>}</div><div className="recommendation-budget-fields">{budgetField("venue", venue?.priceMin ?? null)}{estimateField(venue)}</div></li>{vendorServices.map(service => {
-          const selected = vendors.find(vendor => vendor.id === plan.selections[service]);
-          const suggested = suggestedByService.get(service);
-          const possible = !suggested && !selected && !searching && !venueTooSmall ? possibleOption(service) : undefined;
-          const overBy = possible?.priceMin === null || possible?.priceMin === undefined ? 0 : Math.round((planningCostTotal + possible.priceMin - budget) * 100);
-          const emptyText = venueTooSmall ? "Choose a venue that fits your guests first" : searching ? "Checking the directory…" : possible ? `Possible option: ${possible.name} · ${possible.borough}${overBy > 0 ? ` · would put known starting prices ${money(overBy)} over budget` : possible.priceMin === null ? " · price unknown" : " · review before adding"}` : "No listing fits your guests and category budget";
-          const shown = selected ?? suggested;
-          return <li key={service}><div><strong>{serviceLabels[service]}</strong><p>{shown ? <>{detailsButton(shown)} · {selected ? "already in your plan" : shown.borough}</> : emptyText}</p>{shown && <small>{shown.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(shown)} · Capacity: {capacityLabel(shown)}</small>}</div><div className="recommendation-budget-fields">{budgetField(service, shown?.priceMin ?? null)}{estimateField(shown)}</div></li>;
-        })}</ul><div className="category-budget-total"><strong>Planning cost with this group: {money(Math.round(planningCostTotal * 100))}</strong><span>{unknownPlanningPrices ? `${unknownPlanningPrices} price${unknownPlanningPrices === 1 ? "" : "s"} still unknown` : planningCostTotal > budget ? `${money(Math.round((planningCostTotal - budget) * 100))} over event budget` : `${money(Math.round((budget - planningCostTotal) * 100))} under event budget`}</span></div><div className="category-budget-total"><strong>Assigned category budgets: {money(allocation.assignedCents)}</strong><span>{allocation.unassignedCents === null ? "Set a total event budget above." : allocation.unassignedCents < 0 ? `${money(-allocation.unassignedCents)} over your total event budget` : `${money(allocation.unassignedCents)} not assigned yet`}</span></div><p className="helper">Planning cost uses your estimates first, then listed starting prices. Suggested budgets are planning allowances, not vendor quotes.</p>{suggestedBudgets.unfilled.length > 0 && <p className="alert" role="status">There is not enough unassigned budget to suggest an amount for every choice. Increase the total or lower an existing category budget.</p>}{recommended.length > 0 && !allCategoriesChosen && <button type="button" className="primary-button" onClick={chooseGroup} disabled={venueTooSmall || !groupFitsBudget || (allocation.unassignedCents !== null && allocation.unassignedCents < 0) || suggestedBudgets.unfilled.length > 0}>Add suggested group and budgets</button>}</>}
+        {phase === "vendors" && <>
+          <p className="helper">Suggestions prefer the chosen venue’s borough. Listed prices and capacities are planning clues, not confirmed quotes or availability.</p>
+          <ul className="recommendation-list">
+            <li><div><strong>Venue</strong><p>{venue ? detailsButton(venue) : "Venue details unavailable"} · selected by you</p>{venue && <small>{venue.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(venue)}</small>}</div><div className="recommendation-budget-fields">{budgetField("venue", venue?.priceMin ?? null)}</div></li>
+            {vendorServices.map(service => {
+              const selected = vendors.find(vendor => vendor.id === plan.selections[service]);
+              const suggested = suggestedByService.get(service);
+              const possible = !suggested && !selected && !searching && !venueTooSmall ? possibleOption(service) : undefined;
+              const emptyText = venueTooSmall ? "Choose a venue that fits your guests first" : searching ? "Checking the directory…" : possible ? `Possible option: ${possible.name} · ${possible.borough} · review before adding` : "No listing fits your guests and category budget";
+              const shown = selected ?? suggested;
+              return <li key={service}><div><strong>{serviceLabels[service]}</strong><p>{shown ? <>{detailsButton(shown)} · {selected ? "already in your plan" : shown.borough}</> : emptyText}</p>{shown && <small>{shown.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(shown)} · Capacity: {capacityLabel(shown)}</small>}</div><div className="recommendation-budget-fields">{budgetField(service, shown?.priceMin ?? null)}</div></li>;
+            })}
+          </ul>
+          <div className="category-budget-total"><strong>Planned spend with this group: {money(suggestedSpendCents)}</strong><span>{suggestedRemainingCents < 0 ? `${money(-suggestedRemainingCents)} over event budget` : `${money(suggestedRemainingCents)} remaining`}</span></div>
+          <p className="helper">Each category budget is the amount you plan to spend. Suggested amounts are editable and do not confirm a vendor’s price.</p>
+          {suggestedBudgets.unfilled.length > 0 && <p className="alert" role="status">There is not enough room in the event budget to suggest an amount for every choice. Increase the total or lower another category budget.</p>}
+          {recommended.length > 0 && !allCategoriesChosen && <button type="button" className="primary-button" onClick={chooseGroup} disabled={venueTooSmall || !groupFitsBudget || (allocation.remainingCents !== null && allocation.remainingCents < 0) || suggestedRemainingCents < 0 || suggestedBudgets.unfilled.length > 0}>Add suggested group and budgets</button>}
+        </>}
         <p className="helper">Prefer to decide yourself? <a href="#vendor-search">Browse all vendors below.</a></p>
       </>}
     <VendorDetailsDialog vendor={detailsVendor} onClose={() => setDetailsVendor(null)} />

@@ -186,9 +186,14 @@ remove it, or look for a replacement; the API gives a specific correction
 message if a stale selected ID reaches the server. A listing already chosen is
 identified as such in search results.
 
-Budget checks use complete entered estimates first, then listed starting
-prices as planning minimums. An unfinished number such as `500.` does not count
-as an estimate. Service warnings use the category's readable name. Fictional
+The coordinator enters one budget per selected vendor category: the amount
+planned to spend. The same amount appears in the suggested group, chosen plan,
+and report. Planned spend sums these category budgets; listing prices are
+comparison points and never silently added to that total. A selected vendor
+without a budget is called out, and a budget below a known listed starting
+price prompts a check. An unfinished number such as `500.` does not count.
+Older saved vendor estimates fill empty category budgets when opened. Service
+warnings use the category's readable name. Fictional
 calendar examples remain in the user's event month and do not occupy the
 event's own date. They are never written into the saved plan or its conflict
 checks. These extension behaviors are covered by tests and remain subject to
