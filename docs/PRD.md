@@ -2,7 +2,7 @@
 
 Source: https://docs.google.com/document/d/1eqek1tXTcvPv9cgyvkWScJjRMRW4HO3Phi-A7GKCodc
 
-Status snapshot updated November 10, 2026. The Google Doc is the working PRD. PR #10 has merged into develop. PRs #11 and #13 are open for review.
+Status snapshot updated November 11, 2026. The Google Doc is the working PRD. PRs #10 and #11 have merged into develop. PR #13 remains open for review.
 
 Event Horizon — AI EVENT READINESS & TASK AUTOMATION
 
@@ -151,9 +151,9 @@ Sub-journey: Correct a fact and rerun
 
 - [P1] User can see each agent’s role, evidence, unknowns, and any disagreement.
 
-### 3a. Current build and expanded vendor workflow — November 10, 2026
+### 3a. Current build and expanded vendor workflow — November 11, 2026
 
-**Status.** The seeded arrival review, optional Recovery follow-up drafts, Vendor Finder, schedule rules, and two-agent review are on `develop` after [PR #10](https://github.com/anastasiyaglegg/eventhorizon/pull/10) merged. [PR #11](https://github.com/anastasiyaglegg/eventhorizon/pull/11) was synchronized with updated `develop` and is mergeable, awaiting Crystal’s review. [PR #13](https://github.com/anastasiyaglegg/eventhorizon/pull/13) adds a theme-led home page and a shared local calendar/conflict workflow; it is also open for Crystal’s review. Nothing in #11 or #13 has merged. Lanice’s approval remains separate.
+**Status.** The seeded arrival review, optional Recovery follow-up drafts, Vendor Finder, schedule rules, and two-agent review are on `develop` after [PR #10](https://github.com/anastasiyaglegg/eventhorizon/pull/10) merged. [PR #11](https://github.com/anastasiyaglegg/eventhorizon/pull/11) merged into `develop` on November 10 and improved the arrival review screen. [PR #13](https://github.com/anastasiyaglegg/eventhorizon/pull/13) adds a theme-led home page and a shared local calendar/conflict workflow; it remains open for review. Lanice’s approval remains separate.
 
 **Vendor Finder.** A separate page searches a Supabase directory of real businesses by category, name, and borough. Official source links are provided when recorded. Demo prices, capacity, and availability are explicitly fictional and must not be used as verified facts. Contact information and reviews may be missing. The vendor chatbot is on hold until Anastasiya requests it.
 
@@ -165,7 +165,7 @@ Sub-journey: Correct a fact and rerun
 
 **Next important work.**
 
-1. Crystal reviews open PRs #11 and #13; fix findings and merge only with Anastasiya’s instruction.
+1. Review open PR #13, resolve findings, and merge only with Anastasiya’s instruction.
 2. Run the core and vendor flows together from updated `develop`, including normal, boundary, missing-data, and failure cases; verify the connected database and Anthropic configuration without exposing keys.
 3. Decide with the team whether the expanded scope is part of the assessed MVP and submit the revised PRD to Lanice.
 4. Review PR #13’s theme picker, calendar, local event add/cancel, and conflict screen. These plans are saved only in the browser session; they are not external bookings or synchronized calendar events. Notification email was removed from scope at Anastasiya’s request.
