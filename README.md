@@ -61,8 +61,9 @@ features are proposed additions pending the team's review.
 
 Start on the home page to choose a party theme. Use **Search & add** to plan a
 venue and vendors, **Calendar** to see the run sheet, and **Potential conflicts**
-to check timing. Open **Arrival review** for the PRD's required proposed-arrival
-decision. The theme is a saved mood choice; it does not change vendor matches or
+to check timing. On **Arrival and setup**, follow the **open arrival review** link
+to try the PRD's separate proposed-arrival decision. The theme is a saved mood
+choice; it does not change vendor matches or
 scheduling rules. The planning screens are proposed additions awaiting team and
 instructor agreement.
 
