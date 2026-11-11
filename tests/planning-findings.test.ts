@@ -69,4 +69,5 @@ test("a search result already selected says so rather than offering to replace i
   const chosen = sampleVendors.find(vendor => vendor.service === "catering")!;
   assert.deepEqual(vendorResultAction(chosen, { catering: chosen.id }), { label: "Already in your plan", disabled: true });
   assert.match(vendorResultAction({ ...chosen, id: "another" }, { catering: chosen.id }).label, /^Replace planned caterer/);
+  assert.deepEqual(vendorResultAction(chosen, { catering: undefined }), { label: `Add ${chosen.name} to plan`, disabled: false });
 });

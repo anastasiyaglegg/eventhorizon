@@ -57,6 +57,10 @@ export default function VendorFinder() {
     setVendorSlots(current => { const updated = { ...current }; delete updated[id]; return updated; });
     setVendorStatuses(current => { const updated = { ...current }; delete updated[id]; return updated; });
     setCategoryBudgets(current => { const updated = { ...current }; delete updated[service]; return updated; });
+    setReplacementService("");
+    browseCategory(service);
+    dialogRef.current?.close();
+    window.requestAnimationFrame(() => document.getElementById("vendor-results")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }
   const dialogRef = useRef<HTMLDialogElement>(null);
   const validTime = (value: string) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
