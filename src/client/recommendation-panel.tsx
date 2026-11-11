@@ -5,6 +5,7 @@ import { serviceLabels, useEventPlan, type Service } from "./event-plan";
 import { recommendationResponseSchema, type RecommendationResponse } from "../lib/recommendations";
 import { capacityLabel, samplePrice, type Vendor } from "../lib/vendor-search";
 import { budgetSummary, money, suggestCategoryBudgets } from "../lib/budget";
+import { VendorDetailsDialog } from "./vendor-details";
 
 const cache = new Map<string, RecommendationResponse>();
 
@@ -33,6 +34,8 @@ export function RecommendationPanel() {
   const [error, setError] = useState<{ key: string; message: string } | null>(null);
   const [loadingKey, setLoadingKey] = useState("");
   const [retryCount, setRetryCount] = useState(0);
+  const [detailsVendor, setDetailsVendor] = useState<Vendor | null>(null);
+  const detailsButton = (vendor: Vendor) => <button type="button" className="vendor-name-button" onClick={() => setDetailsVendor(vendor)} aria-label={`View contact details for ${vendor.name}`}>{vendor.name}</button>;
 
   useEffect(() => {
     if (!key) return;
@@ -112,16 +115,18 @@ export function RecommendationPanel() {
           : searching ? <p role="status">Finding options from the vendor directory…</p>
           : error?.key === key && !venueTooSmall ? <div className="alert" role="alert"><p>{error.message}</p><button type="button" className="secondary-button" onClick={() => { setError(null); setRetryCount(count => count + 1); }}>Try again</button></div>
           : response ? <p className="helper">{response.note}</p> : null}
-        {phase === "venue" && response && <ul className="recommendation-list">{recommended.map(vendor => <li key={vendor.id}><div><strong>{vendor.name}</strong><p>{vendor.borough} · {vendor.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(vendor)} · Capacity: {capacityLabel(vendor)}</p></div><button type="button" className="secondary-button" onClick={() => chooseVenue(vendor.id)}>Choose venue</button></li>)}</ul>}
-        {phase === "vendors" && <><p className="helper">Suggestions prefer the chosen venue’s borough. Listed prices and capacities are planning clues, not confirmed quotes or availability.</p><ul className="recommendation-list"><li><div><strong>Venue</strong><p>{venue?.name ?? "Venue details unavailable"} · selected by you</p>{venue && <small>{venue.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(venue)}</small>}</div>{budgetField("venue", venue?.priceMin ?? null)}</li>{vendorServices.map(service => {
+        {phase === "venue" && response && <ul className="recommendation-list">{recommended.map(vendor => <li key={vendor.id}><div><strong>{detailsButton(vendor)}</strong><p>{vendor.borough} · {vendor.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(vendor)} · Capacity: {capacityLabel(vendor)}</p></div><button type="button" className="secondary-button" onClick={() => chooseVenue(vendor.id)}>Choose venue</button></li>)}</ul>}
+        {phase === "vendors" && <><p className="helper">Suggestions prefer the chosen venue’s borough. Listed prices and capacities are planning clues, not confirmed quotes or availability.</p><ul className="recommendation-list"><li><div><strong>Venue</strong><p>{venue ? detailsButton(venue) : "Venue details unavailable"} · selected by you</p>{venue && <small>{venue.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(venue)}</small>}</div>{budgetField("venue", venue?.priceMin ?? null)}</li>{vendorServices.map(service => {
           const selected = vendors.find(vendor => vendor.id === plan.selections[service]);
           const suggested = suggestedByService.get(service);
           const possible = !suggested && !selected && !searching && !venueTooSmall ? possibleOption(service) : undefined;
           const overBy = possible?.priceMin === null || possible?.priceMin === undefined ? 0 : Math.round((knownStartingTotal + possible.priceMin - budget) * 100);
           const emptyText = venueTooSmall ? "Choose a venue that fits your guests first" : searching ? "Checking the directory…" : possible ? `Possible option: ${possible.name} · ${possible.borough}${overBy > 0 ? ` · would put known starting prices ${money(overBy)} over budget` : possible.priceMin === null ? " · price unknown" : " · review before adding"}` : "No listing fits your guests and category budget";
-          return <li key={service}><div><strong>{serviceLabels[service]}</strong><p>{selected ? `${selected.name} · already in your plan` : suggested ? `${suggested.name} · ${suggested.borough}` : emptyText}</p>{suggested && <small>{suggested.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(suggested)} · Capacity: {capacityLabel(suggested)}</small>}</div>{budgetField(service, (suggested ?? selected)?.priceMin ?? null)}</li>;
+          const shown = selected ?? suggested;
+          return <li key={service}><div><strong>{serviceLabels[service]}</strong><p>{shown ? <>{detailsButton(shown)} · {selected ? "already in your plan" : shown.borough}</> : emptyText}</p>{shown && <small>{shown.isSynthetic ? "Sample price" : "Listed price"}: {samplePrice(shown)} · Capacity: {capacityLabel(shown)}</small>}</div>{budgetField(service, shown?.priceMin ?? null)}</li>;
         })}</ul><div className="category-budget-total"><strong>Known starting prices with this group: {money(Math.round(knownStartingTotal * 100))}</strong><span>{unknownStartingPrices ? `${unknownStartingPrices} price${unknownStartingPrices === 1 ? "" : "s"} still unknown` : knownStartingTotal > budget ? `${money(Math.round((knownStartingTotal - budget) * 100))} over event budget` : `${money(Math.round((budget - knownStartingTotal) * 100))} under event budget`}</span></div><div className="category-budget-total"><strong>Assigned category budgets: {money(allocation.assignedCents)}</strong><span>{allocation.unassignedCents === null ? "Set a total event budget above." : allocation.unassignedCents < 0 ? `${money(-allocation.unassignedCents)} over your total event budget` : `${money(allocation.unassignedCents)} not assigned yet`}</span></div><p className="helper">Suggested budgets use the event total and listed starting prices, with part of the spare budget left unassigned. They are planning allowances, not vendor quotes.</p>{suggestedBudgets.unfilled.length > 0 && <p className="alert" role="status">There is not enough unassigned budget to suggest an amount for every choice. Increase the total or lower an existing category budget.</p>}{recommended.length > 0 && !allCategoriesChosen && <button type="button" className="primary-button" onClick={chooseGroup} disabled={venueTooSmall || (allocation.unassignedCents !== null && allocation.unassignedCents < 0) || suggestedBudgets.unfilled.length > 0}>Add suggested group and budgets</button>}</>}
         <p className="helper">Prefer to decide yourself? <a href="#vendor-search">Browse all vendors below.</a></p>
       </>}
+    <VendorDetailsDialog vendor={detailsVendor} onClose={() => setDetailsVendor(null)} />
   </section>;
 }

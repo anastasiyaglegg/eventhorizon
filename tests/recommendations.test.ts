@@ -49,6 +49,8 @@ test("demo directory has ten clearly fictional choices in every category", () =>
     assert.equal(sampleVendors.filter(vendor => vendor.service === service).length, 10, service);
   }
   assert.ok(sampleVendors.every(vendor => vendor.isSynthetic && vendor.sourceUrl === null));
+  assert.equal(new Set(sampleVendors.map(vendor => vendor.name.toLowerCase())).size, sampleVendors.length);
+  assert.ok(sampleVendors.every(vendor => !vendor.name.includes("Silver Meridian")));
 });
 
 test("vendor group covers all available categories and skips categories already chosen", async () => {

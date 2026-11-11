@@ -124,6 +124,15 @@ p { line-height: 1.55; }
 .vendor-form input { width: 100%; }
 .vendor-card-heading { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .vendor-contact { font-weight: 650; color: var(--ink); }
+.vendor-name-button { padding: 0; border: 0; background: transparent; color: var(--blue); font-weight: inherit; text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.vendor-name-button:hover, .vendor-name-button:focus-visible { color: #fff; }
+.recommendation-panel .vendor-name-button { color: #ebd8ff; }
+.chosen-plan .vendor-name-button { color: #b4f1d8; }
+.vendor-details-dialog { width: min(560px, calc(100% - 32px)); }
+.vendor-details-list { display: grid; gap: 10px; margin: 18px 0; }
+.vendor-details-list > div { padding: 10px 0; border-top: 1px solid var(--line); }
+.vendor-details-list dt { color: var(--muted); font-size: .82rem; font-weight: 700; }
+.vendor-details-list dd { margin: 4px 0 0; overflow-wrap: anywhere; }
 .vendor-review { border-left: 3px solid var(--line); margin: 12px 0 0; padding: 4px 0 4px 12px; }
 .vendor-review p { font-size: 0.9rem; margin: 0; }
 .recommendation-panel { margin: 22px 0; padding: 20px; border: 2px solid #9576d4; border-radius: 14px; background: linear-gradient(150deg, #2b2350, #1c2043); box-shadow: inset 0 0 32px #aa80ff16; }
